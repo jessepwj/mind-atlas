@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="mind-atlas logo">
+  <rect width="256" height="256" rx="52" fill="#f6f7f9"/>
+  <g fill="none" stroke="#c9ced6" stroke-width="6" stroke-linecap="round">
+    <path d="M84 128 C112 128 112 62 138 62"/>
+    <path d="M84 128 H138"/>
+    <path d="M84 128 C112 128 112 194 138 194"/>
+  </g>
+  <rect x="24" y="98" width="62" height="60" rx="16" fill="#24292f"/>
+  <rect x="38" y="122" width="34" height="8" rx="4" fill="#ffffff" opacity="0.9"/>
+  <rect x="38" y="136" width="22" height="8" rx="4" fill="#ffffff" opacity="0.55"/>
+  <rect x="138" y="42" width="94" height="40" rx="13" fill="#2f6fba"/>
+  <rect x="152" y="58" width="48" height="8" rx="4" fill="#ffffff" opacity="0.9"/>
+  <rect x="138" y="108" width="94" height="40" rx="13" fill="#2a9d70"/>
+  <rect x="152" y="124" width="60" height="8" rx="4" fill="#ffffff" opacity="0.9"/>
+  <rect x="138" y="174" width="94" height="40" rx="13" fill="#d9822b"/>
+  <rect x="152" y="190" width="40" height="8" rx="4" fill="#ffffff" opacity="0.9"/>
+</svg>

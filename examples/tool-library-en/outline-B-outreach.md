@@ -1,0 +1,9 @@
+- Outreach and events [in progress] | Getting neighbors to know about the shed, and getting them to show up. The details come from branch two of the research.
+  - Spreading the word
+    - Flyers at the café and the library [done] | 200 flyers printed in March.
+    - One post a month in the neighborhood chat [active]
+    - Feature in the local newsletter [todo] | The editor has not answered yet. [waiting]
+  - Events
+    - Opening day in April [done] | About 40 people came and 12 signed up that day. [src: Event photos folder]
+    - Monthly repair cafe on the first Saturday [in progress] | Runs well when two volunteers are present.
+    - Summer swap-and-repair day [todo] | Tentatively 20 July; the hall is not booked yet.

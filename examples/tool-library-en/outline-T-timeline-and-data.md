@@ -1,0 +1,7 @@
+- Timeline | Fixed commitments and dates in one place, so nothing hides inside a branch.
+  - First Saturday of every month, 10:00: open day and repair cafe [active]
+  - End of November: renew the hall agreement [todo]
+  - Before winter: waiver review [todo] | Depends on the legal clinic having a free slot.
+- Where the data lives | Everything is in the volunteers' shared drive. Nothing important lives only in a chat.
+  - Inventory sheet | The spreadsheet "Shed inventory", updated after every open day.
+  - Sign-out sheets | Scanned once a month into the folder "Loans".

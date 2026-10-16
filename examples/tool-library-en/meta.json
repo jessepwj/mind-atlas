@@ -1,0 +1,17 @@
+{
+  "id": "demo-tool-library",
+  "title": "Neighborhood Tool Library (example)",
+  "lang": "en",
+  "out": "tool-library.html",
+  "level": "L3 Detailed (example, scaled down)",
+  "desc": "A small demo map with made-up content: the trunk was written by the mapper, and two branches pretend to come from read-only research sub-agents.",
+  "search_hint": "Search, e.g. damp, waiver, drill",
+  "parts": [
+    "outline-trunk.md",
+    "outline-A-inventory.md",
+    "outline-B-outreach.md",
+    "outline-T-timeline-and-data.md",
+    "outline-Z-problems-and-next-steps.md",
+    "outline-about.md"
+  ]
+}

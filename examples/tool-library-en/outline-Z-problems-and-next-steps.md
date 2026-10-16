@@ -1,0 +1,13 @@
+- Problems and next steps | Ordered as "protect the tools, then the people, then grow". Items tagged Proposal are the mapper's own judgment and are not decided; the founder reviews them.
+  - 1. Protect the tools
+    - Damp wall may rust the steel tools [risk] | Humidity is high after rain and there are only a few silica bags so far.
+      - Move steel tools to the top shelf and buy two dehumidifier boxes [proposal]
+    - Drills and sanders are never on the shelf [issue]
+      - Buy a second drill and limit power-tool loans to 3 days [proposal] | Whether to shorten the loan time is for the founder to decide.
+  - 2. Protect the people
+    - The waiver has never been reviewed by a lawyer [risk]
+      - Ask the council's legal clinic to review it before winter [proposal]
+    - Volunteer C works weekends only, so weekday outreach has stalled [issue]
+      - Recruit one more volunteer through the neighborhood chat [proposal]
+  - 3. Grow
+    - Open a second pick-up point at the library [todo] | Needs the librarian's agreement and enough tools to split the stock.

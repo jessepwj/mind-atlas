@@ -1,0 +1,9 @@
+  - Space
+    - Back room of the church hall, about 12 m2 [active] | Free in exchange for two volunteer hours a month. [src: Hall agreement, March]
+    - Damp patch on the north wall [issue] | Water marks appear after heavy rain.
+  - What is on the shelves
+    - About 140 items, mostly hand tools | Hand tools make up about two thirds, garden tools a quarter, and power tools the rest. [src: Inventory sheet, 1 October]
+    - Drills and sanders are always out [issue]
+  - Labels and records
+    - Every item has a numbered tag [active]
+    - Barcode scanner for sign-out [stopped] | Tried in April. The phone app was slower than the paper sheet, so it was dropped.

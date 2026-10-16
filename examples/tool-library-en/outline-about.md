@@ -1,0 +1,4 @@
+- About this map | A demo that ships with mind-atlas. The content is fictional; it exists to show the outline format and the page.
+  - How it was made | The trunk (purpose, rules, people) was written by the mapper. The "Inventory and storage" and "Spreading the word" branches pretend to come from read-only sub-agents and were rewritten into outline form. The timeline, the data locations and the problems cut across all branches, so the mapper wrote them.
+  - How to update it | Edit the outline-*.md files in this folder, then run python3 skills/mind-atlas/scripts/build.py examples/tool-library-en.
+  - How to give feedback | Hover over a node and click the orange 💬 to quote it, or select some text and click "Quote this" to quote one sentence; you can also just write. Then click "Copy for AI" and paste the result into your chat.
