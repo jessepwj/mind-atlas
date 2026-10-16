@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="{{HTMLLANG}}">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+:root{
+  --bg:#f6f7f9; --ink:#1f2328; --muted:#6a737d; --line:#c9ced6; --panel:#fff; --fbw:380px; --q:#fb8500;
+  --done:#1a7f37; --run:#0969da; --todo:#9a6700; --bad:#cf222e; --stop:#6e7781; --wait:#8250df; --decided:#116329; --risk:#bc4c00; --idea:#0550ae;
+}
+body.fbc{--fbw:38px}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;overflow:hidden}
+header{position:relative;z-index:5;background:#fff;border-bottom:1px solid #e1e4e8;padding:10px 16px 8px;margin-right:var(--fbw)}
+h1{font-size:18px;margin:0 0 2px}
+.meta{color:var(--muted);font-size:12px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.bar input{flex:1 1 200px;min-width:160px;padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:14px}
+.bar button{padding:5px 10px;border:1px solid #d0d7de;background:#f6f8fa;border-radius:6px;cursor:pointer;font-size:13px;color:var(--ink)}
+.bar button:hover{background:#eef1f4}
+.bar button.on{background:#ddf4ff;border-color:#54aeff}
+.bar .sep{width:1px;height:20px;background:#d0d7de;margin:0 2px}
+.hits{font-size:12px;color:var(--muted);min-width:60px}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+/* Canvas: drag or two-finger swipe to pan, pinch or Ctrl/Cmd+wheel to zoom */
+#stage{position:absolute;top:var(--hh,130px);left:0;right:var(--fbw);bottom:0;overflow:hidden;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+#stage.drag{cursor:grabbing}
+#map{position:absolute;left:0;top:0;transform-origin:0 0;padding:24px 40px 80px 24px;width:max-content;will-change:transform}
+#map.anim{transition:transform .35s ease}
+/* Tree connectors */
+.branch{position:relative;display:flex;align-items:center}
+.children{position:relative;display:flex;flex-direction:column;padding-left:26px}
+.children::before{content:"";position:absolute;left:0;top:50%;width:26px;border-top:1.5px solid var(--line)}
+.children>.branch{padding:3px 0 3px 18px}
+.children>.branch::before{content:"";position:absolute;left:0;top:50%;width:18px;border-top:1.5px solid var(--line)}
+.children>.branch::after{content:"";position:absolute;left:0;top:0;bottom:0;border-left:1.5px solid var(--line)}
+.children>.branch:first-child::after{top:50%}
+.children>.branch:last-child::after{bottom:50%}
+.children>.branch:only-child::after{display:none}
+.collapsed>.children{display:none}
+/* Nodes */
+.node{position:relative;max-width:360px;padding:5px 10px;border-radius:8px;background:#fff;border:1px solid hsl(var(--h),45%,72%);cursor:pointer;box-shadow:0 1px 1px rgba(0,0,0,.04)}
+.node:hover{box-shadow:0 0 0 2px hsl(var(--h),70%,80%)}
+.d0>.node{background:#24292f;color:#fff;border:none;font-size:17px;font-weight:700;padding:10px 16px;max-width:240px}
+.d1>.node{background:hsl(var(--h),58%,44%);color:#fff;border:none;font-weight:600;font-size:15px;padding:7px 12px}
+.d2>.node{background:hsl(var(--h),70%,95%);border-left:4px solid hsl(var(--h),58%,50%);font-weight:500}
+.d3>.node{max-width:380px}
+.node.sel{outline:2.5px solid var(--q);outline-offset:1px}
+.node .t{white-space:normal;word-break:break-word}
+.node .more{display:none;margin-left:6px;font-size:11px;padding:0 6px;border-radius:9px;background:hsl(var(--h),40%,90%);color:hsl(var(--h),50%,30%);font-weight:600}
+.d1>.node .more{background:rgba(255,255,255,.25);color:#fff}
+.collapsed>.node .more{display:inline-block}
+.node .ni{display:inline-block;margin-left:4px;font-size:11px;color:hsl(var(--h),50%,45%)}
+.d1>.node .ni,.d0>.node .ni{color:#fff;opacity:.8}
+.note{display:none;margin-top:4px;padding-top:4px;border-top:1px dashed hsl(var(--h),40%,82%);font-size:12px;color:#444;font-weight:400}
+.d1>.node .note,.d0>.node .note{color:#f0f0f0;border-top-color:rgba(255,255,255,.4)}
+body.shownotes .note{display:block}
+body.shownotes .node .ni{display:none}
+.qbtn{display:none;position:absolute;right:-11px;top:-11px;width:24px;height:24px;border-radius:50%;background:var(--q);color:#fff;font-size:12px;line-height:20px;text-align:center;border:2px solid #fff;cursor:pointer;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.node:hover>.qbtn{display:block}
+.qbtn:hover{transform:scale(1.15)}
+.fbn{display:inline-block;margin-left:5px;padding:0 6px;border-radius:9px;font-size:11px;line-height:17px;background:var(--q);color:#fff;font-weight:600;vertical-align:1px}
+.fbn:empty{display:none}
+.tag{display:inline-block;margin-left:5px;padding:0 6px;border-radius:9px;font-size:11px;line-height:17px;color:#fff;vertical-align:1px;font-weight:500}
+.tag-active,.tag-done{background:var(--done)}
+.tag-doing{background:var(--run)}
+.tag-todo{background:var(--todo)}
+.tag-issue{background:var(--bad)}
+.tag-stopped{background:var(--stop)}
+.tag-waiting{background:var(--wait)}
+.tag-decided{background:var(--decided)}
+.tag-risk{background:var(--risk)}
+.tag-proposal{background:var(--idea)}
+/* Search */
+body.searching .node{opacity:.28}
+body.searching .node.hit,body.searching .node.path{opacity:1}
+.node.hit{box-shadow:0 0 0 3px #ffd33d}
+.node.cur{box-shadow:0 0 0 3px var(--q)}
+/* Outline view */
+#outline{display:none;position:absolute;top:var(--hh,130px);left:0;right:var(--fbw);bottom:0;overflow:auto;padding:12px 16px 60px}
+body.outline #stage{display:none}
+body.outline #outline{display:block}
+#outline details{margin:2px 0 2px 0}
+#outline details details,#outline .leaf{margin-left:18px}
+#outline summary{cursor:pointer;padding:2px 0}
+#outline .leaf{padding:2px 0 2px 14px;position:relative}
+#outline .leaf::before{content:"•";position:absolute;left:2px;color:var(--muted)}
+#outline .on{font-size:12px;color:#555;margin:1px 0 3px 14px}
+#outline .os{font-size:11px;color:var(--muted);margin:0 0 3px 14px;word-break:break-all}
+#outline .lv1>summary{font-weight:700;font-size:15px;color:hsl(var(--h),58%,36%)}
+#outline .hit{background:#fff8c5}
+#outline [data-oid]{cursor:pointer}
+#outline .oq{visibility:hidden;cursor:pointer;margin-left:6px;font-size:12px;padding:0 6px;border-radius:9px;background:var(--q);color:#fff}
+#outline summary:hover>.oq,#outline .leaf:hover>.oq{visibility:visible}
+/* Right panel: details of the selected node + feedback */
+#fb{position:fixed;top:0;right:0;bottom:0;width:var(--fbw);background:#fff;border-left:1px solid #d0d7de;display:flex;flex-direction:column;z-index:7;box-shadow:-2px 0 8px rgba(0,0,0,.04)}
+#fb .rz{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:2}
+#fb .fh{display:flex;align-items:center;gap:8px;padding:10px 12px 9px;border-bottom:1px solid #eaeef2;flex:none}
+#fb .fh b{font-size:15px}
+#fb .conn{font-size:12px;color:var(--muted)}
+#fb .conn.ok::before{content:"● ";color:var(--done)}
+#fb .conn.bad{color:var(--bad)}
+#fb .conn.bad::before{content:"● "}
+#fb .conn a{color:var(--run)}
+#fb .fold{margin-left:auto;border:1px solid #d0d7de;background:#f6f8fa;border-radius:6px;cursor:pointer;font-size:12px;padding:2px 8px;color:var(--ink)}
+#fb .fv{display:none;flex:1;cursor:pointer;writing-mode:vertical-rl;text-align:center;padding:14px 0;font-size:14px;color:var(--ink);letter-spacing:4px;align-items:center;justify-content:flex-start}
+#fb .fv:hover{background:#f6f8fa}
+html[lang="en"] #fb .fv{letter-spacing:1px}
+#fb .fv i{font-style:normal;writing-mode:horizontal-tb;display:inline-block;margin-top:8px;background:var(--q);color:#fff;border-radius:9px;font-size:11px;padding:0 5px;letter-spacing:0}
+body.fbc #fb>*:not(#panel):not(.fv){display:none}
+body.fbc #fb .fv{display:flex}
+/* Details (top of the right panel; floats over the canvas when the panel is folded) */
+#panel{display:none;flex:none;max-height:42%;overflow:auto;padding:10px 14px 10px;border-bottom:1px solid #eaeef2;background:#fbfcfd;position:relative}
+#panel.open{display:block}
+body.fbc #panel.open{position:fixed;right:calc(var(--fbw) + 12px);top:calc(var(--hh,130px) + 10px);width:360px;max-height:calc(100% - var(--hh,130px) - 24px);border:1px solid #d0d7de;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.12);background:#fff}
+#panel .crumb{font-size:12px;color:var(--muted);margin:0 22px 6px 0}
+#panel .crumb a{color:var(--muted);cursor:pointer;text-decoration:none}
+#panel .crumb a:hover{text-decoration:underline}
+#panel h2{font-size:15px;margin:0 0 6px}
+#panel .pq{margin:2px 0 4px;border:1px solid var(--q);background:#fff8f0;color:#b45309;border-radius:6px;padding:2px 10px;font-size:12px;cursor:pointer}
+#panel .pq:hover{background:#ffedd5}
+#panel .pn{white-space:pre-wrap;margin:6px 0}
+#panel .ps{font-size:12px;color:var(--muted);background:#f6f8fa;border-radius:6px;padding:6px 8px;word-break:break-all;margin:6px 0}
+#panel ul{margin:6px 0;padding-left:18px}
+#panel li{margin:2px 0;cursor:pointer}
+#panel li:hover{color:var(--run)}
+#panel .x{position:absolute;right:8px;top:6px;border:none;background:none;font-size:18px;cursor:pointer;color:var(--muted)}
+/* Feedback list */
+#fbl{flex:1;overflow:auto;padding:10px 12px;min-height:90px;background:#f6f8fa}
+#fbl .empty{font-size:13px;color:#57606a;background:#fff;border:1px dashed #d0d7de;border-radius:8px;padding:10px 12px}
+#fbl .empty p{margin:0 0 6px}
+#fbl .empty p:last-child{margin:0}
+.fi{margin-bottom:10px;padding:8px 10px;border:1px solid #e1e4e8;border-radius:8px;background:#fff}
+.fi.pend{border-style:dashed;border-color:var(--bad)}
+.fi .ft{display:flex;gap:8px;font-size:11px;color:var(--muted)}
+.fi .ft .act{margin-left:auto;cursor:pointer}
+.fi .ft .act:hover{color:var(--bad);text-decoration:underline}
+.qb{border-left:3px solid var(--q);background:#fff8f0;padding:3px 8px;margin:5px 0;font-size:12px;border-radius:0 6px 6px 0;cursor:pointer;word-break:break-word}
+.qb:hover{background:#ffedd5}
+.qb .qp{color:#8c959f;font-size:11px}
+.fi .fx{white-space:pre-wrap;margin:4px 0 2px;font-size:13.5px;word-break:break-word}
+.fi .fc{font-size:11px;color:#8c959f}
+.fi .fs{font-size:11px;color:var(--muted);margin-top:2px}
+.fi .fs.seen{color:var(--done)}
+.fi .fr{margin-top:6px;padding:6px 8px;background:#ddf4ff;border-radius:6px;font-size:13px;white-space:pre-wrap;word-break:break-word}
+.fi .fr .frh{font-size:11px;color:#0550ae;margin-bottom:2px}
+/* Feedback input */
+#fbc{flex:none;border-top:1px solid #d0d7de;padding:8px 10px 10px;background:#fff}
+#fbq .qc{display:flex;gap:6px;align-items:flex-start;margin-bottom:5px}
+#fbq .qc .qb{flex:1;margin:0}
+#fbq .qc .x{cursor:pointer;color:var(--muted);font-size:15px;line-height:20px;padding:0 2px}
+#fbq .qc .x:hover{color:var(--bad)}
+#fbt{width:100%;min-height:76px;max-height:40vh;resize:none;border:1px solid #d0d7de;border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;line-height:1.5;outline:none}
+#fbt:focus{border-color:#54aeff;box-shadow:0 0 0 3px rgba(84,174,255,.25)}
+#fbc .row{display:flex;align-items:center;gap:8px;margin-top:6px}
+#fbc .hint{font-size:11px;color:var(--muted);flex:1}
+#fbc button{border-radius:6px;cursor:pointer;font-size:13px;padding:5px 12px}
+#fbs{background:#1f883d;color:#fff;border:1px solid #1a7f37}
+#fbs:hover{background:#1a7f37}
+#fbn{background:#f6f8fa;color:var(--ink);border:1px solid #d0d7de}
+#fbn:disabled{color:#8c959f;cursor:default}
+#selq{position:fixed;display:none;z-index:20;background:#24292f;color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#selq:hover{background:#000}
+#fbc .hint a{color:var(--muted)}
+#fbc .hint a:hover{color:var(--run)}
+.fi .fs.warn{color:#9a6700}
+.fi .ft .act+.act{margin-left:8px}
+#cpm{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:40;align-items:center;justify-content:center}
+#cpm.open{display:flex}
+#cpm .box{background:#fff;border-radius:10px;padding:14px 16px;width:min(640px,90vw)}
+#cpm p{margin:6px 0;font-size:13px;color:#57606a}
+#cpm textarea{width:100%;height:46vh;font:12px/1.5 ui-monospace,Menlo,monospace;border:1px solid #d0d7de;border-radius:6px;padding:8px}
+#cpm .row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+#cpm button{border:1px solid #d0d7de;background:#f6f8fa;border-radius:6px;padding:5px 12px;cursor:pointer}
+#cpm #cpok{background:#1f883d;color:#fff;border-color:#1a7f37}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#24292f;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;z-index:30;display:none}
+</style>
+</head>
+<body>
+<header id="hdr">
+  <h1>{{TITLE}}</h1>
+  <div class="meta" id="metaline"></div>
+  <div class="bar">
+    <input id="q" data-i18n-ph="search_hint_default" autocomplete="off">
+    <span class="hits" id="hits"></span>
+    <span class="sep"></span>
+    <button data-lv="1" data-i18n="btn_lv1"></button><button data-lv="2" data-i18n="btn_lv2"></button><button data-lv="3" data-i18n="btn_lv3"></button><button data-lv="4" data-i18n="btn_lv4"></button><button data-lv="99" data-i18n="btn_lv_all"></button>
+    <span class="sep"></span>
+    <button id="bn" data-i18n="btn_notes"></button>
+    <button id="bo" data-i18n="btn_outline"></button>
+    <span class="sep"></span>
+    <button id="zo" data-i18n-title="zoom_out_title">&minus;</button><button id="zr" data-i18n-title="zoom_reset_title">100%</button><button id="zi" data-i18n-title="zoom_in_title">&#xFF0B;</button><button id="zf" data-i18n="btn_fit"></button><button id="zh" data-i18n="btn_home"></button>
+  </div>
+  <div class="legend" id="legend"></div>
+</header>
+<main id="stage"><div id="map"></div></main>
+<div id="outline"></div>
+<aside id="fb">
+  <div class="rz" id="rz" data-i18n-title="fb_resize_title"></div>
+  <div class="fv" id="fv" data-i18n-title="fb_expand_title"><span data-i18n="fb_label"></span><i id="fvn"></i></div>
+  <div class="fh"><b data-i18n="fb_label"></b><span class="conn" id="conn"></span><button class="fold" id="ffold" data-i18n-title="fb_fold_title"></button></div>
+  <div id="panel"><button class="x" id="px" data-i18n-title="panel_close_title">&times;</button><div id="pc"></div></div>
+  <div id="fbl"></div>
+  <div id="fbc">
+    <div id="fbq"></div>
+    <textarea id="fbt" data-i18n-ph="fb_placeholder"></textarea>
+    <div class="row"><span class="hint"><span data-i18n="fb_hint"></span><br><a href="#" id="fba" data-i18n="fb_copy_all"></a></span><button id="fbn" data-i18n-title="btn_copy_title"></button><button id="fbs" data-i18n="btn_submit"></button></div>
+  </div>
+</aside>
+<div id="selq" data-i18n="sel_quote"></div>
+<div id="toast"></div>
+<div id="cpm"><div class="box"><b data-i18n="cp_title"></b><p data-i18n="cp_text"></p><textarea id="cpt" readonly></textarea><div class="row"><button id="cpok" data-i18n="cp_ok"></button><button id="cpx" data-i18n="cp_cancel"></button></div></div></div>
+<script id="data" type="application/json">/*DATA*/</script>
+<script id="meta" type="application/json">/*META*/</script>
+<script id="replies" type="application/json">/*REPLIES*/</script>
+<script id="i18n" type="application/json">/*I18N*/</script>
+<script>
+(function(){
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const META = JSON.parse(document.getElementById('meta').textContent), REPLIES = JSON.parse(document.getElementById('replies').textContent);
+const I18N = JSON.parse(document.getElementById('i18n').textContent);
+// t(key, vars): look up a UI string; {name} placeholders are filled from vars; {one, other} entries pick by vars.n
+function t(key, v){
+  let s = I18N[key];
+  if (s && typeof s === 'object') s = (v && v.n === 1) ? s.one : s.other;
+  s = s == null ? key : String(s);
+  return v ? s.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m)) : s;
+}
+const HUES = [212, 152, 28, 280, 350, 190, 95, 45, 255, 320, 170, 5, 230, 130, 60, 300, 15, 200];
+const TAGS = ["active", "done", "doing", "todo", "waiting", "issue", "risk", "stopped", "decided", "proposal"];   // legend order
+const tagLabel = g => (I18N.tags && I18N.tags[g]) || g;
+const $ = id => document.getElementById(id);
+const byId = {}; let seq = 0;
+function prep(n, d, parent, hue){
+  n.id = 'n' + (seq++); n.d = d; n.p = parent; byId[n.id] = n;
+  n.h = d === 0 ? 215 : hue;
+  n.c.forEach((c, i) => prep(c, d + 1, n, d === 0 ? HUES[i % HUES.length] : n.h));
+}
+prep(DATA, 0, null, 215);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function count(n){ return n.c.reduce((a, c) => a + 1 + count(c), 0); }
+function tagsHtml(n){ return n.g.map(g => `<span class="tag tag-${esc(g)}">${esc(tagLabel(g))}</span>`).join(''); }
+function path(n){ const a = []; while (n){ a.unshift(n); n = n.p; } return a; }
+const titles = n => path(n).map(x => x.t);
+const keyOf = arr => arr.join(' › ');
+const byKey = {}; Object.values(byId).forEach(n => { n.key = keyOf(titles(n)); byKey[n.key] = n; });
+function toast(s){ const el = $('toast'); el.textContent = s; el.style.display = 'block'; clearTimeout(toast.tm); toast.tm = setTimeout(() => el.style.display = 'none', 2600); }
+document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
+document.querySelectorAll('[data-i18n-title]').forEach(e => { e.title = t(e.dataset.i18nTitle); });
+document.querySelectorAll('[data-i18n-ph]').forEach(e => { e.placeholder = t(e.dataset.i18nPh); });
+if (typeof META.search_hint === 'string') $('q').placeholder = META.search_hint;
+$('metaline').textContent = t('meta_line', {stamp: META.stamp || '', level: META.level ? t('meta_level', {level: META.level}) : '', desc: META.desc || ''});
+
+// ===== Mind map =====
+function build(n){
+  const b = document.createElement('div');
+  b.className = 'branch d' + Math.min(n.d, 3) + (n.c.length ? '' : ' leaf');
+  b.style.setProperty('--h', n.h);
+  const nd = document.createElement('div');
+  nd.className = 'node'; nd.id = n.id;
+  nd.innerHTML = `<span class="qbtn" title="${esc(t('node_quote_title'))}">💬</span><span class="t">${esc(n.t)}</span>${tagsHtml(n)}<span class="fbn" title="${esc(t('node_fb_title'))}"></span>${(n.n || n.s) ? `<span class="ni" title="${esc(t('node_info_title'))}">ⓘ</span>` : ''}${n.c.length ? `<span class="more">+${count(n)}</span>` : ''}${n.n ? `<div class="note">${esc(n.n)}</div>` : ''}`;
+  b.appendChild(nd);
+  if (n.c.length){
+    const ch = document.createElement('div'); ch.className = 'children';
+    n.c.forEach(c => ch.appendChild(build(c)));
+    b.appendChild(ch);
+  }
+  n.el = b; n.nodeEl = nd;
+  return b;
+}
+const map = $('map'), stage = $('stage');
+map.appendChild(build(DATA));
+
+// Pan and zoom: position is driven entirely by a transform; the canvas has no scrollbars
+let tx = 0, ty = 0, zoom = 1;
+function apply(){ map.style.transform = `translate(${tx}px,${ty}px) scale(${zoom})`; $('zr').textContent = Math.round(zoom * 100) + '%'; }
+function anim(){ map.classList.add('anim'); clearTimeout(anim.tm); anim.tm = setTimeout(() => map.classList.remove('anim'), 380); }
+function zoomAt(z, px, py){ z = Math.max(0.2, Math.min(2.5, z)); tx = px - (px - tx) * z / zoom; ty = py - (py - ty) * z / zoom; zoom = z; apply(); }
+function zoomCenter(z){ zoomAt(z, stage.clientWidth / 2, stage.clientHeight / 2); }
+function centerOn(n, smooth){
+  const r = n.nodeEl.getBoundingClientRect(), s = stage.getBoundingClientRect();
+  tx += s.left + s.width / 2 - (r.left + r.width / 2); ty += s.top + s.height / 2 - (r.top + r.height / 2);
+  if (smooth) anim(); apply();
+}
+function keepPinned(n, fn){
+  const a = n.nodeEl.getBoundingClientRect(); fn(); const b = n.nodeEl.getBoundingClientRect();
+  tx += a.left - b.left; ty += a.top - b.top; apply();
+}
+function home(){
+  const r = DATA.nodeEl.getBoundingClientRect(), s = stage.getBoundingClientRect();
+  tx += s.left + 30 - r.left; ty += s.top + s.height / 2 - (r.top + r.height / 2); anim(); apply();
+}
+function fit(){
+  const w = map.offsetWidth, h = map.offsetHeight, sw = stage.clientWidth, sh = stage.clientHeight;
+  zoom = Math.max(0.2, Math.min(1.2, Math.min(sw / w, sh / h) * 0.96));
+  tx = Math.max(10, (sw - w * zoom) / 2); ty = (sh - h * zoom) / 2; anim(); apply();
+}
+let drag = null, moved = false;
+stage.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.target.closest('.qbtn')) return;
+  drag = {x: e.clientX, y: e.clientY, tx, ty, id: e.pointerId}; moved = false;
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!moved && Math.abs(dx) + Math.abs(dy) > 4){
+    moved = true; stage.classList.add('drag'); map.classList.remove('anim');
+    try { stage.setPointerCapture(drag.id); } catch (_) {}
+  }
+  if (moved){ tx = drag.tx + dx; ty = drag.ty + dy; apply(); }
+});
+function endDrag(){ if (!drag) return; drag = null; stage.classList.remove('drag'); setTimeout(() => moved = false, 0); }
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('wheel', e => {
+  e.preventDefault(); map.classList.remove('anim');
+  if (e.ctrlKey || e.metaKey){
+    const s = stage.getBoundingClientRect(), d = Math.max(-60, Math.min(60, e.deltaY));
+    zoomAt(zoom * Math.exp(-d * 0.008), e.clientX - s.left, e.clientY - s.top);
+  } else {
+    let dx = e.deltaX, dy = e.deltaY;
+    if (e.deltaMode === 1){ dx *= 16; dy *= 16; }
+    if (e.shiftKey && !dx){ dx = dy; dy = 0; }
+    tx -= dx; ty -= dy; apply();
+  }
+}, {passive: false});
+$('zi').onclick = () => { anim(); zoomCenter(zoom + 0.1); };
+$('zo').onclick = () => { anim(); zoomCenter(zoom - 0.1); };
+$('zr').onclick = () => { anim(); zoomCenter(1); };
+$('zf').onclick = fit;
+$('zh').onclick = home;
+
+function setLevel(lv){
+  keepPinned(sel || DATA, () => {
+    Object.values(byId).forEach(n => { if (n.c.length) n.el.classList.toggle('collapsed', n.d >= lv); });
+  });
+  document.querySelectorAll('#outline details').forEach(d => { d.open = +d.className.slice(2) < lv; });
+  document.querySelectorAll('[data-lv]').forEach(b => b.classList.toggle('on', +b.dataset.lv === lv));
+}
+document.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => setLevel(+b.dataset.lv));
+
+// ===== Details (top of the right panel) =====
+const panel = $('panel'), pc = $('pc');
+let sel = null;
+function showPanel(n){
+  if (sel) sel.nodeEl.classList.remove('sel');
+  sel = n; n.nodeEl.classList.add('sel');
+  const crumb = path(n).slice(0, -1).map(x => `<a data-go="${x.id}">${esc(x.t)}</a>`).join(' › ');
+  pc.innerHTML = `<div class="crumb">${crumb || esc(t('crumb_root'))}</div><h2>${esc(n.t)}${tagsHtml(n)}</h2><button class="pq" data-q="${n.id}">${esc(t('panel_quote_btn'))}</button>`
+    + (n.n ? `<div class="pn">${esc(n.n)}</div>` : '')
+    + (n.s ? `<div class="ps">${esc(t('source_line', {s: n.s}))}</div>` : '')
+    + (n.c.length ? `<div style="font-size:12px;color:var(--muted);margin-top:8px">${esc(t('children_head', {n: n.c.length}))}</div><ul>${n.c.map(c => `<li data-go="${c.id}">${esc(c.t)}${tagsHtml(c)}</li>`).join('')}</ul>` : '');
+  panel.classList.add('open'); panel.scrollTop = 0;
+}
+function reveal(n){
+  path(n).slice(0, -1).forEach(x => x.el.classList.remove('collapsed'));
+  if (document.body.classList.contains('outline')){
+    const d = document.querySelector(`#outline [data-oid="${n.id}"]`);
+    if (d){ let e = d; while (e){ if (e.tagName === 'DETAILS') e.open = true; e = e.parentElement; } d.scrollIntoView({block: 'center'}); }
+  } else {
+    centerOn(n, true);
+  }
+}
+pc.addEventListener('click', e => {
+  const q = e.target.closest('[data-q]'); if (q){ addQuote(byId[q.dataset.q], ''); return; }
+  const g = e.target.closest('[data-go]'); if (g){ const n = byId[g.dataset.go]; reveal(n); showPanel(n); }
+});
+$('px').onclick = () => { panel.classList.remove('open'); if (sel) sel.nodeEl.classList.remove('sel'); sel = null; };
+map.addEventListener('click', e => {
+  if (moved) return;
+  const qb = e.target.closest('.qbtn');
+  if (qb){ const n = byId[qb.parentElement.id]; showPanel(n); addQuote(n, ''); return; }
+  const nd = e.target.closest('.node'); if (!nd) return;
+  const n = byId[nd.id];
+  keepPinned(n, () => {
+    if (n.c.length && sel === n) n.el.classList.toggle('collapsed');
+    else if (n.c.length && n.el.classList.contains('collapsed')) n.el.classList.remove('collapsed');
+  });
+  showPanel(n);
+});
+
+// ===== Notes and outline =====
+const bn = $('bn'), bo = $('bo');
+bn.onclick = () => { keepPinned(sel || DATA, () => document.body.classList.toggle('shownotes')); bn.classList.toggle('on'); };
+function buildOutline(n){
+  const note = (n.n ? `<div class="on">${esc(n.n)}</div>` : '') + (n.s ? `<div class="os">${esc(t('source_line', {s: n.s}))}</div>` : '');
+  const head = `<span data-oid="${n.id}">${esc(n.t)}</span>${tagsHtml(n)}<span class="fbn" data-fo="${n.id}"></span><span class="oq" data-q="${n.id}" title="${esc(t('node_quote_title'))}">${esc(t('outline_quote'))}</span>`;
+  if (!n.c.length) return `<div class="leaf" style="--h:${n.h}">${head}${note}</div>`;
+  return `<details class="lv${n.d}" style="--h:${n.h}" ${n.d < 1 ? 'open' : ''}><summary>${head}</summary>${note}${n.c.map(buildOutline).join('')}</details>`;
+}
+const outline = $('outline');
+outline.innerHTML = buildOutline(DATA);
+outline.addEventListener('click', e => {
+  const q = e.target.closest('.oq'); if (q){ e.preventDefault(); const n = byId[q.dataset.q]; showPanel(n); addQuote(n, ''); return; }
+  const h = e.target.closest('[data-oid]'); if (h && !window.getSelection().toString()) showPanel(byId[h.dataset.oid]);
+});
+bo.onclick = () => { document.body.classList.toggle('outline'); bo.classList.toggle('on'); };
+
+// ===== Search =====
+const q = $('q'), hitsEl = $('hits');
+let hits = [], cur = -1, timer = null;
+function clearSearch(){
+  document.querySelectorAll('.node.hit,.node.path,.node.cur').forEach(e => e.classList.remove('hit', 'path', 'cur'));
+  outline.querySelectorAll('.hit').forEach(e => e.classList.remove('hit'));
+  document.body.classList.remove('searching'); hits = []; cur = -1; hitsEl.textContent = '';
+}
+function doSearch(){
+  clearSearch();
+  const s = q.value.trim().toLowerCase(); if (!s) return;
+  hits = Object.values(byId).filter(n => (n.t + ' ' + n.n + ' ' + n.s + ' ' + n.g.map(tagLabel).join(' ')).toLowerCase().includes(s));
+  document.body.classList.add('searching');
+  hits.forEach(n => {
+    n.nodeEl.classList.add('hit');
+    path(n).slice(0, -1).forEach(x => { x.el.classList.remove('collapsed'); x.nodeEl.classList.add('path'); });
+    const o = outline.querySelector(`[data-oid="${n.id}"]`);
+    if (o){ o.classList.add('hit'); let e = o; while (e){ if (e.tagName === 'DETAILS') e.open = true; e = e.parentElement; } }
+  });
+  hitsEl.textContent = hits.length ? t('hits_found', {n: hits.length}) : t('hits_none');
+  if (hits.length) jump(0);
+}
+function jump(i){
+  if (!hits.length) return;
+  if (cur >= 0) hits[cur].nodeEl.classList.remove('cur');
+  cur = (i + hits.length) % hits.length;
+  hits[cur].nodeEl.classList.add('cur');
+  reveal(hits[cur]);
+  hitsEl.textContent = t('hits_at', {i: cur + 1, n: hits.length});
+}
+q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doSearch, 250); });
+q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing){ e.preventDefault(); jump(cur + (e.shiftKey ? -1 : 1)); } if (e.key === 'Escape'){ q.value = ''; clearSearch(); } });
+
+// ===== Feedback panel (static: stored in this browser, handed over with "Copy for AI", replies come back in the regenerated page) =====
+const NS = 'mm:' + META.id + ':';
+let storeOk = true;
+try { localStorage.setItem(NS + 't', '1'); localStorage.removeItem(NS + 't'); } catch (_) { storeOk = false; }
+const lsGet = (k, d) => { if (!storeOk) return d; try { const v = localStorage.getItem(NS + k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } };
+const lsSet = (k, v) => { if (!storeOk) return; try { localStorage.setItem(NS + k, JSON.stringify(v)); } catch (_) {} };
+const fbt = $('fbt'), fbl = $('fbl'), fbq = $('fbq');
+let items = lsGet('items', []);   // {id, ts, quotes, text, ctx, sent, replaces}
+let draft = lsGet('draft', {text: '', quotes: [], replaces: null});
+let quotes = draft.quotes || [], replaces = draft.replaces || null; fbt.value = draft.text || '';
+const repById = {}; REPLIES.forEach(r => (repById[r.id] = repById[r.id] || []).push(r));
+function saveItems(){ lsSet('items', items); }
+function saveDraft(){ lsSet('draft', {text: fbt.value, quotes, replaces}); }
+function grow(){ fbt.style.height = 'auto'; fbt.style.height = Math.min(fbt.scrollHeight + 2, window.innerHeight * 0.4) + 'px'; }
+
+function qHtml(q){
+  const p = q.p.slice(1);
+  const shown = q.x ? esc(keyOf(p)) : (p.length > 1 ? esc(keyOf(p.slice(0, -1))) + ' › ' : '') + `<b>${esc(p[p.length - 1] || q.p[0])}</b>`;
+  return `<div class="qb" data-key="${esc(keyOf(q.p))}" title="${esc(t('quote_goto_title'))}"><div class="qp">${q.x ? shown : ''}</div>${q.x ? esc(t('quote_text', {x: q.x})) : shown}</div>`;
+}
+function renderChips(){
+  fbq.innerHTML = (replaces ? `<div class="fc" style="margin-bottom:4px">${esc(t('chip_revising', {id: replaces}))}</div>` : '')
+    + quotes.map((qq, i) => `<div class="qc">${qHtml(qq)}<span class="x" data-i="${i}" title="${esc(t('chip_remove_title'))}">×</span></div>`).join('');
+}
+function addQuote(n, x){
+  if (!n) return;
+  const p = titles(n), k = keyOf(p);
+  if (!quotes.some(qq => keyOf(qq.p) === k && qq.x === x)) quotes.push({p, x});
+  renderChips(); saveDraft(); setFold(false); fbt.focus();
+}
+fbq.addEventListener('click', e => {
+  const x = e.target.closest('.x'); if (x){ quotes.splice(+x.dataset.i, 1); renderChips(); saveDraft(); return; }
+  goKey(e);
+});
+function goKey(e){
+  const b = e.target.closest('.qb'); if (!b) return;
+  const n = byKey[b.dataset.key];
+  if (!n){ toast(t('toast_not_found')); return; }
+  reveal(n); showPanel(n);
+}
+fbl.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]');
+  if (a){ act(a.dataset.act, a.dataset.id); return; }
+  goKey(e);
+});
+
+const hm = ts => ts ? t('ts_format', {M: ts.slice(5, 7), D: ts.slice(8, 10), hm: ts.slice(11, 16)}) : '';
+function itemHtml(it){
+  const qs = (it.quotes || []).map(qHtml).join('');
+  const ctx = !(it.quotes || []).length && it.ctx && it.ctx.length > 1 ? `<div class="fc">${esc(t('item_ctx', {x: it.ctx[it.ctx.length - 1]}))}</div>` : '';
+  const reps = repById[it.id] || [];
+  let st = '';
+  if (it.orphan) st = `<div class="fc">${esc(t('item_orphan'))}</div>`;
+  else if (!reps.length) st = it.sent ? `<div class="fs seen">${esc(t('item_sent', {when: hm(it.sent)}))}</div>` : `<div class="fs warn">${esc(t('item_unsent'))}</div>`;
+  const rp = reps.map(r => `<div class="fr"><div class="frh">${esc(t('reply_head', {when: hm(r.ts)}))}</div>${esc(r.text)}</div>`).join('');
+  const acts = it.orphan ? '' : `<span class="act" data-act="edit" data-id="${esc(it.id)}" title="${esc(t('act_edit_title'))}">${esc(t('act_edit'))}</span><span class="act" data-act="del" data-id="${esc(it.id)}" title="${esc(t('act_del_title'))}">${esc(t('act_del'))}</span>`;
+  const head = it.replaces ? `<div class="fc">${esc(t('item_replaces', {id: it.replaces}))}</div>` : '';
+  return `<div class="fi"><div class="ft"><span>${esc(hm(it.ts))}</span>${acts}</div>${head}${qs}<div class="fx">${esc(it.text)}</div>${ctx}${st}${rp}</div>`;
+}
+const emptyHtml = () => `<div class="empty"><p><b>${esc(t('empty_lead'))}</b>${esc(t('empty_p1'))}</p><p>${esc(t('empty_p2'))}</p><p>${esc(t('empty_p3'))}</p></div>`;
+function render(){
+  const nearBottom = fbl.scrollHeight - fbl.scrollTop - fbl.clientHeight < 60;
+  const mine = new Set(items.map(i => i.id));
+  const orphans = Object.keys(repById).filter(id => !mine.has(id)).map(id => {
+    const r = repById[id][0];
+    return {id, ts: r.ts, text: r.orig || t('orphan_text'), quotes: [], orphan: true};
+  });
+  const all = items.concat(orphans).sort((a, b) => (a.ts < b.ts ? -1 : 1));
+  fbl.innerHTML = all.length ? all.map(itemHtml).join('') : emptyHtml();
+  if (nearBottom) fbl.scrollTop = fbl.scrollHeight;
+  markNodes();
+  const fresh = items.filter(i => !i.sent).length;
+  $('fbn').textContent = fresh ? t('btn_copy_new', {n: fresh}) : t('btn_copy');
+  $('fba').style.display = items.some(i => i.sent) ? '' : 'none';
+  $('fvn').textContent = fresh || '';
+  const c = $('conn');
+  if (storeOk){ c.className = 'conn ok'; c.textContent = t('conn_ok'); }
+  else { c.className = 'conn bad'; c.textContent = t('conn_bad'); }
+}
+function markNodes(){
+  const cnt = {};
+  items.forEach(it => new Set((it.quotes || []).map(qq => keyOf(qq.p))).forEach(k => { cnt[k] = (cnt[k] || 0) + 1; }));
+  Object.values(byId).forEach(n => { const c = cnt[n.key] || 0; n.nodeEl.querySelector('.fbn').textContent = c ? '💬' + c : ''; });
+  outline.querySelectorAll('[data-fo]').forEach(s => { const c = cnt[byId[s.dataset.fo].key] || 0; s.textContent = c ? '💬' + c : ''; });
+}
+function nowTs(){ const d = new Date(), p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
+function newId(){ const d = new Date(), p = x => String(x).padStart(2, '0'); return `F${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2, 4)}`; }
+function submit(){
+  const text = fbt.value.trim();
+  if (!text){ toast(quotes.length ? t('toast_need_text_quoted') : t('toast_need_text')); fbt.focus(); return; }
+  items.push({id: newId(), ts: nowTs(), quotes, text, ctx: sel ? titles(sel) : null, sent: null, replaces});
+  saveItems();
+  quotes = []; replaces = null; fbt.value = ''; renderChips(); saveDraft(); grow(); render();
+  fbl.scrollTop = fbl.scrollHeight;
+}
+function act(kind, id){
+  const it = items.find(x => x.id === id); if (!it) return;
+  if (kind === 'del' && it.sent && !confirm(t('confirm_delete_sent'))) return;
+  items = items.filter(x => x.id !== id); saveItems();
+  if (kind === 'edit'){
+    (it.quotes || []).forEach(qq => { if (!quotes.some(x => keyOf(x.p) === keyOf(qq.p) && x.x === qq.x)) quotes.push(qq); });
+    fbt.value = it.text + (fbt.value.trim() ? '\n' + fbt.value : '');
+    if (it.sent) replaces = it.id; else if (it.replaces) replaces = it.replaces;
+    renderChips(); saveDraft(); grow(); fbt.focus();
+  }
+  render();
+}
+function exportText(list){
+  const L = [t('export_head', {title: META.title, n: list.length})];
+  if (META.file) L.push(t('export_file', {file: META.file}));
+  if (META.reply_cmd) L.push(t('export_reply', {cmd: META.reply_cmd}));
+  L.push('');
+  list.forEach((it, i) => {
+    L.push(`${i + 1}. [${it.id}] ${hm(it.ts)}` + (it.replaces ? t('export_revises', {id: it.replaces}) : ''));
+    (it.quotes || []).forEach(q => L.push('   ' + t('export_quote', {path: keyOf(q.p.slice(1)) || q.p[0]}) + (q.x ? '\n         ' + t('export_quote_text', {x: q.x}) : t('export_quote_whole'))));
+    if (!(it.quotes || []).length && it.ctx && it.ctx.length > 1) L.push('   ' + t('export_noquote', {path: keyOf(it.ctx.slice(1))}));
+    L.push('   ' + t('export_says') + it.text.replace(/\n/g, '\n      '), '');
+  });
+  return L.join('\n');
+}
+async function copyText(text){
+  try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
+  try {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok;
+  } catch (_) { return false; }
+}
+let toMark = [];
+function markSent(list){ const ts = nowTs(); list.forEach(it => { it.sent = it.sent || ts; }); saveItems(); render(); }
+async function copyOut(all){
+  if (fbt.value.trim() && confirm(t('confirm_submit_first'))) submit();
+  const list = items.filter(i => all || !i.sent);
+  if (!list.length){ toast(items.length ? t('toast_all_copied') : t('toast_no_feedback')); return; }
+  const text = exportText(list);
+  if (await copyText(text)){ markSent(list); toast(t('toast_copied', {n: list.length})); return; }
+  toMark = list; $('cpt').value = text; $('cpm').classList.add('open'); $('cpt').focus(); $('cpt').select();
+}
+$('cpok').onclick = () => { markSent(toMark); toMark = []; $('cpm').classList.remove('open'); };
+$('cpx').onclick = () => { toMark = []; $('cpm').classList.remove('open'); };
+$('fbs').onclick = submit;
+$('fbn').onclick = () => copyOut(false);
+$('fba').onclick = e => { e.preventDefault(); copyOut(true); };
+fbt.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.isComposing){ e.preventDefault(); submit(); } });
+fbt.addEventListener('input', () => { grow(); clearTimeout(fbt.tm); fbt.tm = setTimeout(saveDraft, 300); });
+window.addEventListener('storage', e => { if (e.key === NS + 'items'){ items = lsGet('items', []); render(); } });
+
+// Quote selected text (works in the details, the outline and the feedback list)
+const selq = $('selq'); let selInfo = null;
+document.addEventListener('mouseup', e => setTimeout(() => {
+  if (e.target.closest && e.target.closest('#selq')) return;
+  const s = window.getSelection(), txt = s.toString().trim();
+  if (!txt || !s.rangeCount){ selq.style.display = 'none'; selInfo = null; return; }
+  const a = s.anchorNode, el = a && (a.nodeType === 1 ? a : a.parentElement);
+  let n = null;
+  if (!el) return;
+  if (el.closest('#pc')) n = sel;
+  else if (el.closest('#outline')){ const o = el.closest('details,.leaf'); const h = o && o.querySelector(':scope > summary > [data-oid], :scope > [data-oid]'); n = h && byId[h.dataset.oid]; }
+  else if (el.closest('.qb')) n = byKey[el.closest('.qb').dataset.key];
+  if (!n){ selq.style.display = 'none'; selInfo = null; return; }
+  const r = s.getRangeAt(0).getBoundingClientRect();
+  selq.style.display = 'block';
+  selq.style.left = Math.max(8, Math.min(window.innerWidth - 110, r.left + r.width / 2 - 45)) + 'px';
+  selq.style.top = (r.top > 44 ? r.top - 34 : r.bottom + 6) + 'px';
+  selInfo = {n, x: txt.slice(0, 3000)};
+}, 0));
+selq.addEventListener('mousedown', e => e.preventDefault());
+selq.onclick = () => { if (selInfo) addQuote(selInfo.n, selInfo.x); selq.style.display = 'none'; selInfo = null; window.getSelection().removeAllRanges(); };
+
+// Fold and resize
+function setFold(f){
+  document.body.classList.toggle('fbc', f); lsSet('fold', f);
+  fitHeader();
+}
+$('ffold').onclick = () => setFold(true);
+$('fv').onclick = () => setFold(false);
+function setW(w){ w = Math.max(300, Math.min(760, w)); document.documentElement.style.setProperty('--fbw', w + 'px'); lsSet('w', w); fitHeader(); }
+let rz = null;
+$('rz').addEventListener('pointerdown', e => { if (document.body.classList.contains('fbc')) return; rz = true; $('rz').setPointerCapture(e.pointerId); e.preventDefault(); });
+$('rz').addEventListener('pointermove', e => { if (rz) setW(window.innerWidth - e.clientX); });
+$('rz').addEventListener('pointerup', () => { rz = null; });
+
+// ===== Legend, header height, initial position =====
+$('legend').innerHTML = esc(t('legend_prefix')) + TAGS.map(g => `<span class="tag tag-${g}">${esc(tagLabel(g))}</span>`).join('') + esc(t('legend_suffix'));
+$('ffold').textContent = t('fb_fold');
+function fitHeader(){ document.documentElement.style.setProperty('--hh', $('hdr').offsetHeight + 'px'); }
+const w0 = lsGet('w', 0); if (w0) document.documentElement.style.setProperty('--fbw', w0 + 'px');
+if (lsGet('fold', false)) document.body.classList.add('fbc');
+fitHeader(); window.addEventListener('resize', fitHeader);
+setLevel(2);
+renderChips(); grow(); render();
+requestAnimationFrame(() => { home(); map.classList.remove('anim'); });
+})();
+</script>
+</body>
+</html>

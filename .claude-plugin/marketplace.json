@@ -1,0 +1,30 @@
+{
+  "name": "mind-atlas-marketplace",
+  "owner": {
+    "name": "Pan Wenjie",
+    "url": "https://github.com/jessepwj"
+  },
+  "metadata": {
+    "description": "mind-atlas: an agent skill that maps a project or topic into an interactive multi-level HTML mind map",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "mind-atlas",
+      "source": {
+        "source": "github",
+        "repo": "jessepwj/mind-atlas",
+        "ref": "main"
+      },
+      "description": "Pick a level from overview to panorama, research branches with read-only sub-agents, build a single-file HTML mind map that opens with a double-click, and collect feedback on the map itself. English and Chinese interface. For Claude Code and Codex.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Pan Wenjie",
+        "url": "https://github.com/jessepwj"
+      },
+      "homepage": "https://github.com/jessepwj/mind-atlas",
+      "repository": "https://github.com/jessepwj/mind-atlas",
+      "license": "MIT"
+    }
+  ]
+}
