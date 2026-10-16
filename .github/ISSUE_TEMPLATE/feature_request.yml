@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an improvement to the skill, the page, the scripts, or the docs
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation where the map or the workflow gets in your way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to change?
+      description: A sketch is enough. Say whether it affects the outline syntax, the page, or the skill instructions.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints to keep in mind
+      description: The page is a static single file with no network and no server; scripts use the standard library only. If your idea needs to bend one of these, say why.

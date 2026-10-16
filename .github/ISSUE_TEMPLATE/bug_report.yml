@@ -1,0 +1,51 @@
+name: Bug report
+description: The skill, a script, the page, or an example behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do **not** paste private content, internal paths, or secrets.
+        A minimal outline that reproduces the problem is the most useful thing you can attach.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where?
+      options:
+        - Skill instructions (SKILL.md / references)
+        - build.py
+        - reply.py
+        - The page (layout, interaction, feedback panel)
+        - Interface language / translation
+        - Examples
+        - Docs
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands, `meta.json`, and a minimal outline. Redact anything private.
+      render: markdown
+  - type: input
+    id: runtime
+    attributes:
+      label: Agent / runtime
+      placeholder: "Claude Code 2.x / Codex / none (ran the scripts by hand)"
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and Python version
+      placeholder: "macOS 15, Python 3.12 / Windows 11, Python 3.9 / Ubuntu 24.04, Python 3.13"
+  - type: input
+    id: browser
+    attributes:
+      label: Browser (for page problems)
+      placeholder: "Chrome 130 / Safari 18 / Firefox 133 / Edge"
