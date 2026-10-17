@@ -8,6 +8,8 @@ from helpers import CJK, SCRIPTS, build
 I18N = json.loads((SCRIPTS / "i18n.json").read_text(encoding="utf-8"))
 TEMPLATE = (SCRIPTS / "template.html").read_text(encoding="utf-8")
 BUILD_PY = (SCRIPTS / "build.py").read_text(encoding="utf-8")
+PULL_PY = (SCRIPTS / "pull_feedback.py").read_text(encoding="utf-8")
+NESTED = ("tags", "statuses")      # label tables keyed by status, not UI strings
 VARS = re.compile(r"\{(\w+)\}")
 
 
@@ -33,7 +35,7 @@ class StringTableTests(unittest.TestCase):
 
     def test_same_placeholders_in_every_language(self):
         for key, zh_value in I18N["zh"].items():
-            if key == "tags":
+            if key in NESTED:
                 continue
             with self.subTest(key=key):
                 # a language may use fewer placeholders (a plural form can drop {n}), never different ones
@@ -43,14 +45,14 @@ class StringTableTests(unittest.TestCase):
     def test_plural_entries_have_exactly_one_and_other(self):
         for lang, table in I18N.items():
             for key, value in table.items():
-                if isinstance(value, dict) and key != "tags":
+                if isinstance(value, dict) and key not in NESTED:
                     with self.subTest(lang=lang, key=key):
                         self.assertEqual(sorted(value), ["one", "other"])
 
     def test_values_are_strings_and_not_blank(self):
         for lang, table in I18N.items():
             for key, value in table.items():
-                if key == "tags":
+                if key in NESTED:
                     continue
                 for v in variants(value):
                     with self.subTest(lang=lang, key=key):
@@ -62,7 +64,7 @@ class StringTableTests(unittest.TestCase):
 
     def test_chinese_strings_are_chinese(self):
         for key, value in I18N["zh"].items():
-            if key in ("html_lang", "tags"):
+            if key in ("html_lang",) + NESTED:
                 continue
             if key in ("quote_text", "export_quote_text"):   # just quotation marks around {x}
                 continue
@@ -75,7 +77,12 @@ class StringTableTests(unittest.TestCase):
         for lang in I18N:
             self.assertEqual(set(I18N[lang]["tags"]), keys)
         legend = re.search(r"const TAGS = \[(.*?)\];", TEMPLATE).group(1)
-        self.assertEqual(set(re.findall(r'"(\w+)"', legend)), keys)
+        self.assertEqual(set(re.findall(r'"([\w-]+)"', legend)), keys)
+
+    def test_reply_status_labels_cover_every_status_key(self):
+        keys = set(build.STATUSES) | {"pending", "replied"}      # the two extra ones are shown, never written
+        for lang in I18N:
+            self.assertEqual(set(I18N[lang]["statuses"]), keys, lang)
 
     def test_chinese_labels_are_the_written_spellings(self):
         spelled = {v: k for k, v in build.TAGS_ZH.items()}
@@ -95,7 +102,7 @@ class StringTableTests(unittest.TestCase):
     def test_every_key_is_used_somewhere(self):
         asked = set(re.findall(r"\bt\('(\w+)'", TEMPLATE))
         asked |= set(re.findall(r'data-i18n(?:-title|-ph)?="(\w+)"', TEMPLATE))
-        asked |= {"tags"} | set(re.findall(r'strings\["(\w+)"\]', BUILD_PY))
+        asked |= {"tags", "statuses"} | set(re.findall(r'strings\["(\w+)"\]', BUILD_PY)) | set(re.findall(r'strings\["(\w+)"\]', PULL_PY))
         self.assertEqual(set(I18N["zh"]) - asked, set())
 
     def test_every_language_builds_a_page(self):

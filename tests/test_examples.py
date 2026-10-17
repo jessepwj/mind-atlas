@@ -1,4 +1,5 @@
-"""Every example under examples/ must build cleanly, in its own language, and show off all ten statuses."""
+"""Every example under examples/ must build cleanly and in its own language; the two big ones show off all ten
+statuses, the two small "repair-cafe" ones show the long-running console (the "now" branch and the needs-you tag)."""
 import json
 import re
 import shutil
@@ -8,6 +9,11 @@ import unittest
 from helpers import CJK, EXAMPLES, build, page_json
 
 ALL_STATUSES = {"active", "stopped", "doing", "todo", "issue", "done", "decided", "waiting", "risk", "proposal"}
+CONSOLE = "repair-cafe"      # the folder prefix of the long-running console examples
+
+
+def is_console(path):
+    return path.name.startswith(CONSOLE)
 
 
 def example_dirs():
@@ -28,7 +34,7 @@ class ExampleTests(unittest.TestCase):
                 work = shutil.copytree(str(src), tmp + "/work")
                 result = build.build(work, no_paths=True)
                 self.assertEqual(result.warnings, [])
-                self.assertTrue(40 <= result.nodes <= 70, result.nodes)
+                self.assertTrue((25 if is_console(src) else 40) <= result.nodes <= 70, result.nodes)
                 self.assertGreaterEqual(result.depth, 3)
                 self.assertEqual(result.replies, 0)
 
@@ -45,12 +51,14 @@ class ExampleTests(unittest.TestCase):
             with self.subTest(example=src.name):
                 names = {p.name for p in src.iterdir()}
                 meta = json.loads((src / "meta.json").read_text(encoding="utf-8"))
-                generated = {"outline.md", "replies.json", meta["out"]}
+                generated = {"outline.md", "replies.json", "_fb", meta["out"], meta["out"][:-5] + ".stamp.js"}
                 # (a developer who built in place has these locally; they are git-ignored)
                 self.assertTrue(all(n.endswith(".md") or n == "meta.json" or n in generated for n in names), names)
 
-    def test_every_example_uses_all_ten_statuses(self):
+    def test_the_big_examples_use_all_ten_statuses(self):
         for src in example_dirs():
+            if is_console(src):
+                continue
             with self.subTest(example=src.name):
                 tmp = tempfile.mkdtemp(prefix="mind-atlas-example-")
                 self.addCleanup(shutil.rmtree, tmp, True)
@@ -80,8 +88,28 @@ class ExampleTests(unittest.TestCase):
                 else:
                     self.assertIsNotNone(CJK.search(body))
 
+    def test_the_console_examples_have_a_now_branch_and_something_that_needs_the_user(self):
+        for src in example_dirs():
+            if not is_console(src):
+                continue
+            with self.subTest(example=src.name):
+                tmp = tempfile.mkdtemp(prefix="mind-atlas-example-")
+                self.addCleanup(shutil.rmtree, tmp, True)
+                work = shutil.copytree(str(src), tmp + "/work")
+                meta = json.loads((src / "meta.json").read_text(encoding="utf-8"))
+                result = build.build(work, no_paths=True)
+                self.assertEqual([c["t"] for c in result.root["c"]][0], meta["now"], "the now branch comes first")
+                self.assertTrue(meta["root_key"])
+                tags = [g for n, _, _ in build.walk(result.root) for g in n["g"]]
+                self.assertEqual(tags.count("needs-you"), 2)
+                self.assertGreaterEqual(tags.count("doing"), 1)
+                self.assertGreaterEqual(tags.count("waiting"), 1)
+                self.assertNotIn("{{", result.root["t"])       # the update-time placeholder was replaced
+                self.assertTrue(any(re.match(r"\d\d-\d\d \d\d:\d\d ", n["t"]) for n, _, _ in build.walk(result.root)),
+                                "dated entries for the 'next up' number")
+
     def test_the_english_example_uses_the_ascii_spellings(self):
-        src = next(p for p in example_dirs() if p.name.endswith("-en"))
+        src = EXAMPLES / "tool-library-en"
         body = "".join(p.read_text(encoding="utf-8") for p in src.glob("outline-*.md"))
         self.assertIn(" | ", body)
         self.assertIn("[src: ", body)

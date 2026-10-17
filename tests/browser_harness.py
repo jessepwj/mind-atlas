@@ -110,6 +110,79 @@ SCENARIO_JS = r"""
 """
 
 
+CONSOLE_JS = r"""
+(async function(){
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const $ = id => document.getElementById(id);
+  const out = {errors: window.__errors, violations: window.__violations};
+  try {
+    const chips = () => Array.from(document.querySelectorAll('#cons .chip')).map(c => ({
+      k: c.dataset.k, label: c.querySelector('.lb').textContent, n: c.querySelector('b').textContent,
+      cls: c.className, title: c.title, shown: c.style.display !== 'none', sub: (c.querySelector('.sub') || {}).textContent || ''}));
+    out.chips = chips();
+    out.age = $('age').textContent;
+    out.sections = Array.from(document.querySelectorAll('#fbl .sec > .sh')).map(e => e.childNodes[0].textContent);
+    out.sectionCounts = Array.from(document.querySelectorAll('#fbl .sec > .sh .c')).map(e => e.textContent);
+    out.cards = Array.from(document.querySelectorAll('#fbl .th > summary')).map(e => e.textContent);
+    out.marks = Array.from(document.querySelectorAll('.node .mk.on')).map(e => e.closest('.node').querySelector('.t').textContent + ':' + e.textContent);
+    out.pills = Array.from(document.querySelectorAll('#fbl .st')).map(e => e.textContent);
+    out.flt = Array.from(document.querySelectorAll('.flt button')).map(e => e.textContent);
+    out.home = $('zh').textContent;
+    out.legend = $('legend').textContent;
+    out.hmeta = $('hmeta').textContent;
+    out.nodeBadges = Array.from(document.querySelectorAll('.node .fbn')).filter(e => e.textContent).map(e => e.closest('.node').querySelector('.t').textContent + ':' + e.textContent + (e.classList.contains('hot') ? ':hot' : ''));
+    out.nowExpanded = Array.from(document.querySelectorAll('.nowb')).length;
+    out.pops = {};
+    for (const k of ['ask', 'new', 'chg', 'doing', 'wait', 'next']) {
+      const c = document.querySelector('#cons .chip[data-k="' + k + '"]');
+      c.click(); await sleep(60);
+      const p = $('pop');
+      out.pops[k] = {open: p.classList.contains('open'), head: p.querySelector('.ph b').textContent, hint: p.querySelector('.ph .hint').textContent,
+                     items: Array.from(p.querySelectorAll('.ci, .none')).map(e => e.textContent)};
+      c.click(); await sleep(30);
+    }
+    out.filters = {};
+    for (const f of ['ask', 'doing', 'wait', 'prob', 'chg']) {
+      document.querySelector('[data-f="' + f + '"]').click(); await sleep(60);
+      out.filters[f] = {banner: $('fbanner').textContent, visible: Array.from(document.querySelectorAll('.node')).filter(n => !n.closest('.fhide')).length};
+    }
+    document.querySelector('[data-f=""]').click(); await sleep(60);
+    out.allVisible = Array.from(document.querySelectorAll('.node')).filter(n => !n.closest('.fhide')).length;
+    out.nodes = document.querySelectorAll('.node').length;
+    // jump from a console item to its node
+    document.querySelector('#cons .chip[data-k="ask"]').click(); await sleep(60);
+    const first = document.querySelector('#pop .ci[data-nid]');
+    if (first){ first.click(); await sleep(100); out.jumped = document.querySelector('.node.sel .t').textContent; }
+    document.querySelector('#cons .chip[data-k="ask"]').click(); await sleep(30);
+    // "mark all as read" in the right panel clears the new-reply number but not the open questions
+    const readall = document.querySelector('#fbl .sa[data-act="readall"]');
+    if (readall){ readall.click(); await sleep(100); }
+    out.after = chips();
+    out.countsAfter = Array.from(document.querySelectorAll('#fbl .sec > .sh .c')).map(e => e.textContent);
+    await sleep(2500);       // the page looks for a newer build 1.5 s after it opens
+    out.newverShown = $('newver').classList.contains('on');
+    out.mm = window.__mm ? {read: Object.keys(window.__mm.state().read).length} : null;
+  } catch (e) { window.__errors.push('scenario: ' + e.message); }
+  out.errors = window.__errors; out.violations = window.__violations;
+  const div = document.createElement('div'); div.id = '__result';
+  div.setAttribute('data-b64', btoa(unescape(encodeURIComponent(JSON.stringify(out)))));
+  document.body.appendChild(div);
+})();
+"""
+
+
+def fnv_key(text):
+    """The page's short hash of a node path (FNV-1a, base 36); the snapshot of what the user last saw uses it."""
+    h = 0x811c9dc5
+    for ch in text:
+        h = ((h ^ ord(ch)) * 0x01000193) & 0xffffffff
+    digits, out = "0123456789abcdefghijklmnopqrstuvwxyz", ""
+    while h:
+        h, r = divmod(h, 36)
+        out = digits[r] + out
+    return out or "0"
+
+
 def find_chrome():
     """Path of a Chromium-based browser, or None. MIND_ATLAS_CHROME overrides the search."""
     env = os.environ.get("MIND_ATLAS_CHROME")
@@ -149,15 +222,17 @@ def _kill_tree(proc):
         pass
 
 
-def run_chrome(chrome, url, extra_args=(), timeout=90, budget_ms=15000, window=None, done=None):
+def run_chrome(chrome, url, extra_args=(), timeout=90, budget_ms=15000, window=None, done=None, profile=None):
     """Open `url` headless and return what Chrome printed to stdout (the DOM with --dump-dom).
 
     Chrome's new headless mode may keep running after it has printed the DOM, so instead of waiting for
     the process to exit this polls the output until it looks complete (`done(text)` is true, by default
-    when it ends with </html>), then kills the browser and everything it started.
+    when it ends with </html>), then kills the browser and everything it started. `profile` is a user-data
+    directory to keep (the caller owns it); by default a throwaway one is used and removed.
     """
     done = done or (lambda text: text.rstrip().endswith("</html>"))
-    profile = tempfile.mkdtemp(prefix="mmtest-")
+    keep_profile = profile is not None
+    profile = profile or tempfile.mkdtemp(prefix="mmtest-")
     args = [chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
             "--disable-extensions", "--user-data-dir=" + profile, "--virtual-time-budget=%d" % budget_ms]
     if window:
@@ -193,7 +268,8 @@ def run_chrome(chrome, url, extra_args=(), timeout=90, budget_ms=15000, window=N
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 pass
-        shutil.rmtree(profile, ignore_errors=True)
+        if not keep_profile:
+            shutil.rmtree(profile, ignore_errors=True)
         try:
             os.remove(out_path)
         except OSError:
@@ -201,15 +277,18 @@ def run_chrome(chrome, url, extra_args=(), timeout=90, budget_ms=15000, window=N
     return text
 
 
-def instrument(html, search_term="a", seed=None):
-    """Return the page with the test scripts injected. `seed` = (page id, list of feedback items)."""
+def instrument(html, search_term="a", seed=None, scenario=None, extra_storage=None):
+    """Return the page with the test scripts injected. `seed` = (page id, list of feedback items);
+    `extra_storage` = {localStorage key: JSON-able value} written before the page script runs."""
     seed_js = ""
     if seed:
         page_id, items = seed
         seed_js = "localStorage.setItem(%s, %s);" % (
             json.dumps("mm:%s:items" % page_id), json.dumps(json.dumps(items)))
+    for key, value in (extra_storage or {}).items():
+        seed_js += "localStorage.setItem(%s, %s);" % (json.dumps(key), json.dumps(json.dumps(value)))
     pre = "<script>" + PRE_JS.replace("/*SEED*/", seed_js) + "</script>\n"
-    post = "<script>" + SCENARIO_JS.replace("/*SEARCH*/", json.dumps(search_term)) + "</script>\n"
+    post = "<script>" + (scenario or SCENARIO_JS).replace("/*SEARCH*/", json.dumps(search_term)) + "</script>\n"
     marker = '<script id="data"'
     if marker not in html or "</body>" not in html:
         raise ValueError("not a mind-atlas page")
@@ -217,8 +296,9 @@ def instrument(html, search_term="a", seed=None):
     return html.replace("</body>", post + "</body>", 1)
 
 
-def run_scenario(html_path, search_term="a", seed=None, chrome=None, timeout=90):
-    """Run the scripted scenario against a built page; returns the decoded result dict."""
+def run_scenario(html_path, search_term="a", seed=None, chrome=None, timeout=90, scenario=None, extra_storage=None):
+    """Run a scripted scenario (the default click-through, or `scenario`) against a built page; returns the
+    decoded result dict."""
     chrome = chrome or find_chrome()
     if not chrome:
         raise RuntimeError("no Chrome/Chromium found (set MIND_ATLAS_CHROME)")
@@ -226,8 +306,11 @@ def run_scenario(html_path, search_term="a", seed=None, chrome=None, timeout=90)
     html = src.read_text(encoding="utf-8")
     tmpdir = tempfile.mkdtemp(prefix="mmtest-page-")
     try:
-        page = pathlib.Path(tmpdir) / "page.html"
-        page.write_text(instrument(html, search_term, seed), encoding="utf-8")
+        page = pathlib.Path(tmpdir) / src.name
+        page.write_text(instrument(html, search_term, seed, scenario, extra_storage), encoding="utf-8")
+        stamp = src.with_suffix(".stamp.js")
+        if stamp.exists():                       # a local page checks the .stamp.js beside it for a newer build
+            shutil.copyfile(str(stamp), str(pathlib.Path(tmpdir) / stamp.name))
         dom = run_chrome(chrome, page.as_uri(), ["--dump-dom"], timeout=timeout)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)

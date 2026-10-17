@@ -15,19 +15,19 @@ class PageTests(WorkdirCase):
         html = self.html(result)
         self.assertIn('<html lang="zh-CN">', html)
         self.assertEqual(page_json(html, "meta")["lang"], "zh")
-        self.assertEqual(page_json(html, "i18n")["btn_home"], "回到根")
+        self.assertEqual(page_json(html, "i18n")["btn_home"], "回到「{now}」")
         self.assertEqual(len(result.warnings), 1)
         self.assertIn('no "lang"', result.warnings[0])
 
     def test_chinese_page(self):
         html = self.html(self.build("# Root\n- A\n", lang="zh"))
         self.assertIn('<html lang="zh-CN">', html)
-        self.assertEqual(page_json(html, "i18n")["btn_home"], "回到根")
+        self.assertEqual(page_json(html, "i18n")["btn_home"], "回到「{now}」")
 
     def test_english_page(self):
         html = self.html(self.build("# Root\n- A\n", lang="en"))
         self.assertIn('<html lang="en">', html)
-        self.assertEqual(page_json(html, "i18n")["btn_home"], "Back to root")
+        self.assertEqual(page_json(html, "i18n")["btn_home"], "Back to “{now}”")
 
     def test_unsupported_language_is_an_error(self):
         with self.assertRaises(build.BuildError) as cm:
@@ -81,8 +81,8 @@ class PageTests(WorkdirCase):
     def test_reply_command_placeholders_follow_the_language(self):
         zh = page_json(self.html(self.build("# R\n- A\n", lang="zh")), "meta")["reply_cmd"]
         en = page_json(self.html(self.build("# R\n- A\n", lang="en")), "meta")["reply_cmd"]
-        self.assertTrue(zh.endswith('<编号> "回复"'))
-        self.assertTrue(en.endswith('<id> "reply"'))
+        self.assertTrue(zh.endswith('<编号> "细节" --summary "一句结论" --status 已做 --orig "用户原话"'))
+        self.assertTrue(en.endswith('<id> "details" --summary "one-line conclusion" --status done --orig "the user\'s words"'))
 
     def test_builds_are_reproducible(self):
         old = os.environ.get("SOURCE_DATE_EPOCH")
@@ -102,7 +102,7 @@ class PageTests(WorkdirCase):
 class HostileTextTests(WorkdirCase):
     """Text that looks like template placeholders or markup must reach the page unchanged."""
 
-    PLACEHOLDERS = ["{{TITLE}}", "{{HTMLLANG}}", "/*DATA*/", "/*META*/", "/*REPLIES*/", "/*I18N*/"]
+    PLACEHOLDERS = ["{{TITLE}}", "{{HTMLLANG}}", "/*DATA*/", "/*META*/", "/*REPLIES*/", "/*I18N*/", "/*KNOWN*/", "{{CSP}}"]
 
     def test_placeholders_in_the_outline_are_not_substituted_twice(self):
         hostile = " ".join(self.PLACEHOLDERS)
@@ -115,7 +115,7 @@ class HostileTextTests(WorkdirCase):
         self.assertEqual(data["c"][0]["n"], "more " + hostile)
         meta = page_json(html, "meta")
         self.assertEqual((meta["title"], meta["desc"], meta["level"]), ("Title " + hostile, "Desc " + hostile, "Lv " + hostile))
-        self.assertEqual(page_json(html, "i18n")["btn_home"], "Back to root")   # the I18N block itself is intact
+        self.assertEqual(page_json(html, "i18n")["btn_home"], "Back to “{now}”")   # the I18N block itself is intact
         self.assertEqual(page_json(html, "replies"), [])
         self.assertIn("<title>Title %s</title>" % hostile, html)
         self.assertIn("<h1>Title %s</h1>" % hostile, html)

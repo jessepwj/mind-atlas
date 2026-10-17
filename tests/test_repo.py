@@ -76,7 +76,7 @@ class HygieneTests(unittest.TestCase):
     def test_no_generated_files_are_in_the_tree(self):
         generated = [p.relative_to(ROOT).as_posix() for p in repo_files()
                      if "examples" in p.relative_to(ROOT).parts[:1]
-                     and (p.suffix == ".html" or p.name in ("outline.md", "replies.json"))]
+                     and (p.suffix == ".html" or p.name.endswith(".stamp.js") or "_fb" in p.parts or p.name in ("outline.md", "replies.json"))]
         self.assertEqual(generated, [], "generated files in examples/ should be git-ignored (see .gitignore)")
 
 
@@ -197,7 +197,8 @@ class MetadataTests(unittest.TestCase):
                     "SECURITY.md", ".editorconfig", ".gitattributes", ".gitignore", ".markdownlint.json",
                     ".github/workflows/ci.yml", ".github/PULL_REQUEST_TEMPLATE.md", ".github/ISSUE_TEMPLATE/bug_report.yml",
                     ".github/ISSUE_TEMPLATE/feature_request.yml", ".github/ISSUE_TEMPLATE/config.yml",
-                    "skills/mind-atlas/agents/openai.yaml", "docs/assets/screenshot-en.png", "docs/assets/screenshot-zh.png"):
+                    "skills/mind-atlas/agents/openai.yaml", "docs/assets/screenshot-en.png", "docs/assets/screenshot-zh.png",
+                    "docs/assets/screenshot-console-en.png", "docs/assets/screenshot-console-zh.png"):
             self.assertTrue((ROOT / rel).exists(), rel)
 
     def test_workflows_cover_windows_and_the_python_range(self):

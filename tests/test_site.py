@@ -16,7 +16,7 @@ class SiteTests(unittest.TestCase):
         out = pathlib.Path(tempfile.mkdtemp(prefix="mind-atlas-site-test-"))
         self.addCleanup(shutil.rmtree, str(out), True)
         written = site.build_site(out)
-        self.assertEqual(sorted(written), ["book-corner.html", "tool-library.html"])
+        self.assertEqual(sorted(written), ["book-corner.html", "repair-cafe-zh.html", "repair-cafe.html", "tool-library.html"])
         index = (out / "index.html").read_text(encoding="utf-8")
         for name in written:
             self.assertIn('href="%s"' % name, index)
@@ -24,7 +24,7 @@ class SiteTests(unittest.TestCase):
             self.assertNotIn("file", meta)
             self.assertNotIn("reply_cmd", meta)
         self.assertTrue((out / ".nojekyll").exists())
-        self.assertEqual(sorted(p.name for p in out.iterdir()), [".nojekyll", "book-corner.html", "index.html", "tool-library.html"])
+        self.assertEqual(sorted(p.name for p in out.iterdir()), [".nojekyll", "book-corner.html", "index.html", "repair-cafe-zh.html", "repair-cafe.html", "tool-library.html"])
 
 
 if __name__ == "__main__":
