@@ -6,12 +6,22 @@ Usage:
 
 The work directory holds:
     meta.json      {"title": ..., "id": ..., "lang": "zh" | "en", "level": ..., "desc": ...,
-                    "search_hint": ..., "parts": [outline files, joined in order], "out": ...}
+                    "search_hint": ..., "parts": [outline files, joined in order], "out": ...,
+                    "root_key": the root's fixed name inside node paths, "now": title of the "now" branch}
     outline-*.md   outline pieces (or a single outline.md when "parts" is not given)
     replies.json   replies to the user's feedback (written by reply.py; optional)
-Output: <workdir>/<title>.html (or meta "out"). When "parts" is used, the joined
-outline is also written to <workdir>/outline.md for inspection (never list outline.md in "parts").
+    _fb/           feedback already pulled back (pull_feedback.py writes inbox.jsonl; known.json is an
+                   optional list of feedback items you collected by hand); both are embedded in the page
+Output: <workdir>/<title>.html (or meta "out") and, unless --no-paths, <workdir>/<title>.stamp.js (just the
+build time: a page left open reads it when you return to the tab and offers a refresh). When "parts" is used,
+the joined outline is also written to <workdir>/outline.md for inspection (never list outline.md in "parts").
 The node count of every first-level branch is printed, so a node hung under the wrong parent stands out.
+
+Long-running console (v1.1): every node gets a content fingerprint, so the page can mark nodes that are new or
+edited since the user last looked; "root_key" keeps node paths stable when the root title carries the update
+time ("{{updated}}" in the root title becomes "updated MM-DD HH:MM"); "now" names the first-level branch that
+holds what is going on right now (it takes no colour, starts expanded, and its [in progress] / [waiting] /
+[needs-you] nodes feed the five numbers at the top of the page).
 
 Outline syntax (two spaces per level, spaces only):
     # Root title | root note
@@ -20,8 +30,8 @@ Outline syntax (two spaces per level, spaces only):
         A deeper-indented line that does not start with "- " continues the note above.
 
     Chinese spelling works too:  - 标题 【在用】 ｜ 说明 〔来源〕
-    Status tags (both spellings): active/在用  stopped/已停  in progress/进行中  todo/待做
-    issue/问题  done/已完成  decided/已定  waiting/等别人  risk/风险  proposal/建议
+    Status tags (both spellings): needs-you/要你定  active/在用  stopped/已停  in progress/进行中
+    todo/待做  issue/问题  done/已完成  decided/已定  waiting/等别人  risk/风险  proposal/建议
 
 --no-paths leaves the local page path and reply command out of the page, for pages
 that will be shared or published.
@@ -31,6 +41,7 @@ Standard library only; Python 3.9 or newer.
 import argparse
 import collections
 import datetime
+import hashlib
 import json
 import os
 import pathlib
@@ -42,15 +53,15 @@ TEMPLATE = SCRIPT_DIR / "template.html"
 I18N_FILE = SCRIPT_DIR / "i18n.json"
 
 DEFAULT_LANG = "zh"
-META_FIELDS = {"title", "id", "lang", "level", "desc", "search_hint", "parts", "out"}
+META_FIELDS = {"title", "id", "lang", "level", "desc", "search_hint", "parts", "out", "root_key", "now"}
 
 # Status tags: spelling -> canonical key (the key is what the page stores and styles).
 TAGS_ZH = {
-    "在用": "active", "已停": "stopped", "进行中": "doing", "待做": "todo", "问题": "issue",
+    "要你定": "needs-you", "在用": "active", "已停": "stopped", "进行中": "doing", "待做": "todo", "问题": "issue",
     "已完成": "done", "已定": "decided", "等别人": "waiting", "风险": "risk", "建议": "proposal",
 }
 TAGS_EN = {
-    "active": "active", "stopped": "stopped", "in progress": "doing", "todo": "todo", "issue": "issue",
+    "needs-you": "needs-you", "needs you": "needs-you", "active": "active", "stopped": "stopped", "in progress": "doing", "todo": "todo", "issue": "issue",
     "done": "done", "decided": "decided", "waiting": "waiting", "risk": "risk", "proposal": "proposal",
 }
 _TAG_ZH_ALT = "|".join(map(re.escape, TAGS_ZH))
@@ -59,9 +70,19 @@ TAG_RE = re.compile("【(" + _TAG_ZH_ALT + ")】|(?<!\\\\)\\[(" + _TAG_EN_ALT + 
 SRC_RE = re.compile("〔([^〕]*)〕|(?<!\\\\)\\[(?:src|source):\\s*([^\\]]*)\\]", re.IGNORECASE)
 ESCAPED_RE = re.compile("\\\\(\\[(?:" + _TAG_EN_ALT + "|src:|source:))", re.IGNORECASE)
 SEP_RE = re.compile(" ｜ | \\| ")
+# Reply statuses: canonical key -> accepted spellings (Chinese, English, and the key itself).
+# reply.py keeps an identical copy of STATUS_ALIASES (a test checks that they agree).
+STATUSES = ["done", "doing", "planned", "dropped", "needs-you"]
+STATUS_ALIASES = {
+    "已做": "done", "done": "done",
+    "在做": "doing", "doing": "doing", "in progress": "doing", "in-progress": "doing",
+    "定了待做": "planned", "planned": "planned",
+    "不做": "dropped", "dropped": "dropped",
+    "要你定": "needs-you", "needs-you": "needs-you", "needs you": "needs-you",
+}
 BAD_FILENAME_CHARS = re.compile('[\\\\/:*?"<>|\\x00-\\x1f]')
 
-BuildResult = collections.namedtuple("BuildResult", "out nodes depth kb replies warnings root")
+BuildResult = collections.namedtuple("BuildResult", "out nodes depth kb replies warnings root known tagged")
 
 
 class BuildError(Exception):
@@ -242,14 +263,98 @@ def load_i18n():
     return json.loads(I18N_FILE.read_text(encoding="utf-8"))
 
 
-def now_stamp():
+def now_moment():
     """Local time, or UTC from SOURCE_DATE_EPOCH (reproducible builds)."""
     epoch = os.environ.get("SOURCE_DATE_EPOCH", "")
     if epoch.isdigit():
-        moment = datetime.datetime.fromtimestamp(int(epoch), datetime.timezone.utc)
-    else:
-        moment = datetime.datetime.now()
-    return moment.strftime("%Y-%m-%d %H:%M")
+        return datetime.datetime.fromtimestamp(int(epoch), datetime.timezone.utc)
+    return datetime.datetime.now()
+
+
+def now_stamp():
+    return now_moment().strftime("%Y-%m-%d %H:%M")
+
+
+def normalize_status(value):
+    """Canonical reply status for any accepted spelling (Chinese or English), or None."""
+    return STATUS_ALIASES.get(str(value).strip().lower())
+
+
+def fingerprint(title, tags, note):
+    """Eight hex digits that change when a node's title, status tags or note change."""
+    raw = "\x1f".join([title, ",".join(sorted(tags)), note])
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:8]
+
+
+def annotate(root, root_key):
+    """Give every node its fingerprint "f" and full path "k" (the root is named root_key).
+
+    Returns {path: first node with that path}. The page recomputes paths itself, so "k" is dropped before embedding.
+    """
+    keys = {}
+
+    def rec(node, path):
+        title = root_key if not path else node["t"]
+        here = path + [title]
+        node["f"] = fingerprint(title, node["g"], node["n"])
+        node["k"] = " › ".join(here)
+        keys.setdefault(node["k"], node)
+        for child in node["c"]:
+            rec(child, here)
+
+    rec(root, [])
+    return keys
+
+
+def resolve_node(spec, keys, root_key):
+    """Turn a --node value into a full node path. The root may be left out, and a unique tail or a unique
+    title is enough. Returns (path or None, reason when None)."""
+    s = spec.strip()
+    if s in keys:
+        return s, ""
+    parts = [x.strip() for x in re.split(r"\s*›\s*|\s+>\s+", s) if x.strip()]
+    if not parts:
+        return None, "empty"
+    tail = " › ".join(parts)
+    full = [k for k in keys if k == root_key + " › " + tail]
+    if full:
+        return full[0], ""
+    ends = [k for k in keys if k.endswith(" › " + tail) or k == tail]
+    if len(ends) == 1:
+        return ends[0], ""
+    if len(ends) > 1:
+        return None, "%d node paths end with it; write a longer path" % len(ends)
+    if len(parts) == 1:
+        same = [k for k in keys if k.rsplit(" › ", 1)[-1] == parts[0]]
+        if len(same) == 1:
+            return same[0], ""
+        if len(same) > 1:
+            return None, "%d nodes have this title; write a longer path" % len(same)
+        inside = [k for k in keys if parts[0] in k.rsplit(" › ", 1)[-1]]
+        if len(inside) == 1:
+            return inside[0], ""
+        if len(inside) > 1:
+            return None, "%d node titles contain these words; write a longer path" % len(inside)
+    return None, "not found in the map"
+
+
+def load_jsonl(path):
+    """Read a JSON-lines file; blank and unreadable lines are skipped."""
+    out = []
+    if path.exists():
+        for line in read_text(path).splitlines():
+            if line.strip():
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    pass
+    return out
+
+
+def csp(with_stamp):
+    """Content-Security-Policy for the page. A local page also lets the sibling .stamp.js load."""
+    script = "'unsafe-inline' file:" if with_stamp else "'unsafe-inline'"
+    return ("default-src 'none'; script-src %s; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" % script)
 
 
 def default_out_name(title):
@@ -315,6 +420,7 @@ def build(workdir, no_paths=False):
     if not isinstance(out_name, str) or pathlib.PurePath(out_name).name != out_name or out_name in (".", ".."):
         raise BuildError("meta.json \"out\" must be a plain file name, not a path: %r" % (out_name,))
     out = wd / out_name
+    stamp_js = out.with_suffix(".stamp.js")
 
     lines = collect_lines(wd, meta, warnings)
     root, parse_warnings = parse_outline(lines, src_sep)
@@ -322,9 +428,54 @@ def build(workdir, no_paths=False):
     warnings.extend(check_nodes(root))
     nodes = list(walk(root))
 
+    root_key = meta.get("root_key") or root["t"]
+    if not isinstance(root_key, str):
+        raise BuildError("meta.json \"root_key\" must be a string")
+    now_title = meta.get("now", "")
+    if not isinstance(now_title, str):
+        raise BuildError("meta.json \"now\" must be a string")
+    moment = now_moment()
+    stamp, stamp_full = moment.strftime("%Y-%m-%d %H:%M"), moment.strftime("%Y-%m-%d %H:%M:%S")
+    keys = annotate(root, root_key)
+    for token in ("{{updated}}", "{{更新}}"):
+        root["t"] = root["t"].replace(token, strings["root_updated"].format(md=moment.strftime("%m-%d %H:%M")))
+    if now_title and not any(c["t"] == now_title for c in root["c"]):
+        warnings.append("meta.json \"now\" is %r, but the root has no first-level branch with that title" % now_title)
+
     replies = load_json(wd / "replies.json", default=[])
     if not isinstance(replies, list) or not all(isinstance(r, dict) and "id" in r for r in replies):
         raise BuildError("replies.json must be a list of reply objects (written by reply.py)")
+    ask_nodes = {n["k"] for n, _, _ in nodes if "needs-you" in n["g"]}
+    for i, r in enumerate(replies):
+        r["rid"] = hashlib.sha1(("%s|%s|%d" % (r["id"], r.get("ts", ""), i)).encode("utf-8")).hexdigest()[:10]
+        if r.get("status"):
+            status = normalize_status(r["status"])
+            if status is None:
+                warnings.append("reply %s: status %r is not one of %s" % (r["id"], r["status"], ", ".join(STATUSES)))
+            else:
+                r["status"] = status
+        resolved = []
+        for spec in r.get("nodes") or []:
+            path, why = resolve_node(str(spec), keys, root_key)
+            if path:
+                resolved.append(path)
+            else:
+                warnings.append("reply %s: node %r: %s" % (r["id"], spec, why))
+        r["nodes"] = resolved
+        if r.get("status") == "needs-you" and not (set(resolved) & ask_nodes):
+            warnings.append("reply %s is marked needs-you but points at no node tagged [NEEDS-YOU]; use --node on the "
+                            "matching item in the \"now\" branch, or add the tag in the outline first" % r["id"])
+
+    fb = wd / "_fb"
+    known_src = load_json(fb / "known.json", default=[])
+    if not isinstance(known_src, list):
+        raise BuildError("%s must contain a JSON list" % (fb / "known.json"))
+    known = {}
+    for item in known_src + load_jsonl(fb / "inbox.jsonl"):
+        if isinstance(item, dict) and item.get("id"):
+            known[item["id"]] = {k: item[k] for k in ("id", "ts", "text", "quotes", "ctx", "replaces") if item.get(k) is not None}
+    for n, _, _ in nodes:   # full paths are only needed here; the page works them out itself
+        n.pop("k", None)
 
     page_meta = {
         "id": str(meta.get("id") or title),
@@ -332,26 +483,35 @@ def build(workdir, no_paths=False):
         "lang": lang,
         "level": str(meta.get("level", "")),
         "desc": str(meta.get("desc", "")),
-        "stamp": now_stamp(),
+        "stamp": stamp,
+        "stamp_full": stamp_full,
+        "root_key": root_key,
+        "now": now_title,
+        "statuses": STATUSES,
     }
     if "search_hint" in meta:
         page_meta["search_hint"] = str(meta["search_hint"])
     if not no_paths:
         py = "python" if os.name == "nt" else "python3"
         page_meta["file"] = str(out)
+        page_meta["stamp_js"] = stamp_js.name
         page_meta["reply_cmd"] = '%s "%s" "%s" %s' % (py, SCRIPT_DIR / "reply.py", wd, strings["reply_args"])
 
     # One pass over the template: text that was substituted in is never scanned again, so an outline that
     # happens to contain "{{TITLE}}" or "/*META*/" cannot corrupt the page.
     subs = {
-        "/*DATA*/": js(root), "/*META*/": js(page_meta), "/*REPLIES*/": js(replies), "/*I18N*/": js(strings),
-        "{{TITLE}}": esc(title), "{{HTMLLANG}}": esc(strings["html_lang"]),
+        "/*DATA*/": js(root), "/*META*/": js(page_meta), "/*REPLIES*/": js(replies), "/*KNOWN*/": js(known),
+        "/*I18N*/": js(strings), "{{TITLE}}": esc(title), "{{HTMLLANG}}": esc(strings["html_lang"]),
+        "{{CSP}}": esc(csp(not no_paths)),
     }
     template = TEMPLATE.read_text(encoding="utf-8")
     html = re.sub("|".join(re.escape(k) for k in subs), lambda m: subs[m.group(0)], template)
     write_text(out, html)
+    if not no_paths:
+        write_text(stamp_js, "window.__MM_LATEST=" + js({"stamp_full": stamp_full}) + ";\n")
     depth = max(d for _, d, _ in nodes)
-    return BuildResult(out, len(nodes), depth, out.stat().st_size // 1024, len(replies), warnings, root)
+    tagged = {tag: sum(1 for n, _, _ in nodes if tag in n["g"]) for tag in ("needs-you", "doing", "waiting")}
+    return BuildResult(out, len(nodes), depth, out.stat().st_size // 1024, len(replies), warnings, root, len(known), tagged)
 
 
 def configure_streams():
@@ -375,6 +535,8 @@ def main(argv=None):
     except BuildError as e:
         sys.exit("error: %s" % e)
     print("Wrote %s: %d nodes, deepest level %d, %d KB, %d replies" % (r.out, r.nodes, r.depth, r.kb, r.replies))
+    print("  %d feedback item(s) already pulled back; tagged: %d needs-you, %d in progress, %d waiting"
+          % (r.known, r.tagged["needs-you"], r.tagged["doing"], r.tagged["waiting"]))
     # one line per first-level branch: a node hung under the wrong parent shows up as a lopsided count
     for branch in r.root["c"]:
         print("  %s (%d nodes)" % (branch["t"] or "(empty title)", count_nodes(branch)))

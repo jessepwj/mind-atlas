@@ -21,6 +21,8 @@ desktop.ini
 examples/**/outline.md
 examples/**/*.html
 examples/**/replies.json
+examples/**/*.stamp.js
+examples/**/_fb/
 _site/
 
 # Maps made while working on the project itself
