@@ -48,7 +48,9 @@ def run_script(name, *args, **kwargs):
 
 
 def text(proc):
-    return proc.stdout.decode("utf-8", "replace"), proc.stderr.decode("utf-8", "replace")
+    """Decoded (stdout, stderr) with Windows line endings turned into newlines."""
+    return (proc.stdout.decode("utf-8", "replace").replace("\r\n", "\n"),
+            proc.stderr.decode("utf-8", "replace").replace("\r\n", "\n"))
 
 
 class WorkdirCase(unittest.TestCase):
