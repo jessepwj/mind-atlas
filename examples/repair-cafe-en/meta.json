@@ -1,0 +1,14 @@
+{
+  "id": "demo-repair-cafe",
+  "title": "Repair Cafe running view (example)",
+  "lang": "en",
+  "out": "repair-cafe.html",
+  "level": "L2 Overview (example, long-running view)",
+  "desc": "A small demo of a map you keep open for weeks: the \"Now\" branch feeds the numbers at the top, and the root title carries the update time. All content is made up.",
+  "search_hint": "Search, e.g. soldering, hall, flyers",
+  "root_key": "Repair Cafe",
+  "now": "Now",
+  "parts": [
+    "outline-main.md"
+  ]
+}

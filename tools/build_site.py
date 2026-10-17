@@ -4,7 +4,7 @@
 Usage:
     python3 tools/build_site.py <output-dir>
 
-Each example under examples/ is built with --no-paths (no local paths inside the page) and written to
+Each example under examples/ is built with --no-paths (no local paths or .stamp.js inside the page) and written to
 <output-dir>/<the example's "out" name>; an index.html links them. Standard library only.
 """
 import json
@@ -60,9 +60,10 @@ def build_site(out_dir):
             shutil.copyfile(str(result.out), str(out_dir / result.out.name))
         finally:
             shutil.rmtree(str(tmp), ignore_errors=True)
-        label = "English demo" if meta.get("lang") == "en" else "中文演示"
-        items.append('<li><a href="%s">%s</a> <small>%s, %d nodes</small></li>'
-                     % (result.out.name, label, build.esc(meta["title"]), result.nodes))
+        language = "English" if meta.get("lang") == "en" else "中文"
+        kind = "long-running console / 长期控制台" if meta.get("now") else "full map / 全貌图"
+        items.append('<li><a href="%s">%s</a> <small>%s, %s, %d nodes</small></li>'
+                     % (result.out.name, build.esc(meta["title"]), language, kind, result.nodes))
         written.append(result.out.name)
     build.write_text(out_dir / "index.html", INDEX % {"items": "\n".join(items), "repo": REPO_URL})
     build.write_text(out_dir / ".nojekyll", "")

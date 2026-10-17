@@ -1,0 +1,14 @@
+{
+  "id": "demo-repair-cafe-zh",
+  "title": "旧物维修咖啡馆长期视图（示例）",
+  "lang": "zh",
+  "out": "repair-cafe-zh.html",
+  "level": "L2 速览（示例，长期使用的图）",
+  "desc": "示范一张要开上几周的图：「现在」分支给页面顶部的数字供数，根标题带着更新时间。内容全是虚构的。",
+  "search_hint": "搜索：比如 电烙铁、物业、传单",
+  "root_key": "旧物维修咖啡馆",
+  "now": "现在",
+  "parts": [
+    "outline-main.md"
+  ]
+}
