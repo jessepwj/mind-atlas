@@ -1,7 +1,7 @@
 {
   "name": "mind-atlas",
-  "version": "1.0.0",
-  "description": "An agent skill that turns a project, system or topic into a multi-level, interactive HTML mind map: choose a level, research branches with read-only sub-agents, build a single-file page, and collect feedback right on the map. English and Chinese. For Claude Code and Codex.",
+  "version": "1.1.0",
+  "description": "An agent skill that turns a project, system or topic into a multi-level, interactive HTML mind map: choose a level, research branches with read-only sub-agents, build a single-file page, and collect feedback right on the map, with a console for maps you keep open for days. English and Chinese. For Claude Code and Codex.",
   "author": {
     "name": "Pan Wenjie",
     "url": "https://github.com/jessepwj"
