@@ -1,6 +1,6 @@
 ---
 name: mind-atlas
-description: "Turn a project, system, topic or pile of material into a multi-level, interactive HTML mind map. Pick a level (L1 overview to L4 panorama), optionally fan out read-only sub-agents to research the branches, write an outline, and build a single-file page that opens with a double-click; the user reads it, writes feedback in the page, and copies it back to you. Use when the user asks to map out, outline or get the whole picture of something: 'mind map this', 'map out the whole project', 'give me the big picture', 'draw the structure of X', 'make a panorama of Y'. Chinese triggers: 梳理一下全貌, 理一下, 做成思维导图, 全景梳理, 画个脑图, 把这件事的结构理出来. Also use when the user pastes feedback that starts with [Mind map feedback] or 【导图反馈】: that is the reply step of a map made earlier. Not for a plain explanation, a summary, or a one- or two-level list."
+description: "Turn a project, system, topic or pile of material into a multi-level, interactive HTML mind map. Pick a level (L1 overview to L4 panorama), optionally fan out read-only sub-agents to research the branches, write an outline, and build a single-file page that opens with a double-click; the user reads it, writes feedback in the page, and copies it back to you. Use when the user asks to map out, outline or get the whole picture of something: 'mind map this', 'map out the whole project', 'give me the big picture', 'draw the structure of X', 'make a panorama of Y'. Chinese triggers: 梳理一下全貌, 理一下, 做成思维导图, 全景梳理, 画个脑图, 把这件事的结构理出来. Also use when the user pastes feedback that starts with [Mind map feedback] or 【导图反馈】, or says \"pull my feedback\" (去看反馈): that is the reply step of a map made earlier. Not for a plain explanation, a summary, or a one- or two-level list."
 ---
 
 # mind-atlas: turn something into a multi-level HTML mind map
@@ -76,9 +76,10 @@ grep -o 'id="conn"[^>]*>[^<]*' dom.html
 The layout and interaction live in `scripts/template.html`; think before changing them and retest after.
 
 - **Horizontal tree**: root on the left, growing right. Each first-level branch has its own color (18 colors in rotation). Status tags are colored badges; ⓘ means the node has notes or sources; `+N` is the number of collapsed nodes below. Clicking a node selects it (and expands it if collapsed); clicking the selected node again collapses it.
-- **Viewing**: drag to pan, two-finger swipe on a trackpad, pinch or hold Ctrl/⌘ and scroll to zoom. "Fit to window" and "Back to root" buttons.
-- **Controls**: expand to level 1, 2, 3, 4 or all; show notes; outline view (a collapsible list); search (Enter jumps to the next hit, Shift+Enter to the previous).
-- **Right panel**: details of the selected node (breadcrumb, notes, sources, next level, click to jump) above the feedback area (records and an input box). The panel folds away and can be resized.
+- **Viewing**: drag to pan, two-finger swipe on a trackpad, pinch or hold Ctrl/⌘ and scroll to zoom. The zoom buttons float at the bottom left of the map; "Fit to window" and "Back to Now" (the top left of the map) are there too.
+- **Controls**: expand to level 1, 2, 3, 4 or all; show notes; outline view (a collapsible list); search (Enter jumps to the next hit, Shift+Enter to the previous); "Show only" filters (needs you, in progress, waiting, issues, recently changed); "How to use" and "Legend" under the title.
+- **Console** (only meaningful for a long-running map, see below): five numbers under the title, Needs you, New replies, Recently changed, In progress and Waiting. Click one to list its items, click an item to jump to the node.
+- **Right panel**: details of the selected node (breadcrumb, notes, sources, feedback on this node, next level, click to jump) above the feedback area: questions for the user first, then new replies, then items waiting for the AI, then the handled ones folded by date. The panel folds away and can be resized.
 - One file, all data embedded, no network, no dependency on any service.
 
 ## Feedback loop
@@ -86,25 +87,42 @@ The layout and interaction live in `scripts/template.html`; think before changin
 The user says what they think wherever they are looking; they do not need to work out how to refer to things first.
 
 1. The user writes feedback in the right panel. To address one node, hover over it and click the orange 💬 at its top-right corner to quote the whole node, or select text in the details or the outline view and click "Quote this" to quote one sentence. Quoting is optional.
-2. The user clicks "Copy for AI". That turns the feedback not yet copied into one block of text and puts it on the clipboard; the user pastes it into the chat. If automatic copy fails, the page shows a box with the text selected.
-3. You receive a block that starts with **`[Mind map feedback]`** (`【导图反馈】` on a Chinese page). It holds the page file path, an id per item (such as `F1016-162301-ab`), the quoted node path and sentence, and the user's words. Handle each item (an item marked `(revises F...)` replaces the earlier item with that id: answer the new one and say what changed), then record the reply:
+2. **Preferred path: the user tells you "pull my feedback"** (去看反馈). Only then run `python3 <skill_dir>/scripts/pull_feedback.py <workdir>`: it reads the user's items out of their browser's local storage (read-only, from a temporary copy), prints the ones you have not seen, and records them in `<workdir>/_fb/inbox.jsonl`. **Manual only**: never on a timer, a heartbeat or a scheduled task, never as a service. Browsers flush local storage with a delay (up to about a minute): the script prints when the newest item was written, and if that is older than what the user says they just wrote, wait a moment and run it again instead of reporting "no new feedback". **Fallback path**: the user clicks "Copy for AI", which turns the feedback not yet answered or copied into one block of text on the clipboard, and pastes it into the chat (use this when you cannot find the browser data, or the user switched browsers). If automatic copy fails, the page shows a box with the text selected.
+3. Either way you get the same kind of block, starting with **`[Mind map feedback]`** (`【导图反馈】` on a Chinese page). It holds an id per item (such as `F1016-162301-ab`), the quoted node path and sentence, and the user's words (a pasted block also carries the page file path). Handle each item (an item marked `(revises F...)` replaces the earlier item with that id: answer the new one and say what changed), then record the reply:
 
-```
-python3 <skill_dir>/scripts/reply.py <workdir> <id> "your reply" --orig "the user's original words"
-```
+   ```
+   python3 <skill_dir>/scripts/reply.py <workdir> <id> "details" --summary "one-line conclusion" --status done --orig "the user's original words" [--node "node path"] [--ask "question for the user"] [--no-build]
+   ```
 
-   This appends to `replies.json` and rebuilds the page. Always pass `--orig`: if the user switched browsers, the page cannot find their own item, and `--orig` lets it show their words with your reply. One item can be answered more than once. If the page was built with `--no-paths`, add `--no-paths` to this command too, or the rebuild puts the paths back.
+   This appends to `replies.json` and rebuilds the page. On the page a reply is **one bold conclusion line + a coloured status label + details that fold open + the related nodes**, so the user can read the conclusion and stop.
+   - `--summary`: one whole sentence the user understands at a glance (never a half sentence cut with an ellipsis); without it the first sentence of the details is used. `--status` is one of `done`, `doing` (sent off or under way), `planned` (decided, not started), `dropped` (decided not to do it) or `needs-you`; Chinese spellings (已做, 在做, 定了待做, 不做, 要你定) work too. When one item is answered several times, the last status counts.
+   - `needs-you` means the user must answer or act. Pair it with `--node` pointing at the item tagged `[needs-you]` in the "Now" branch (the build warns when none matches), and put the question in `--ask`.
+   - `--node` can be repeated: a path (the root may be left out, levels joined with ›) or a title that identifies one node; the build warns when it is not found or is ambiguous.
+   - Always pass `--orig`: if the user switched browsers, the page cannot find their own item, and `--orig` lets it show their words with your reply. When answering many items, add `--no-build` to all but the last, which builds once.
+   - The old form `reply.py <workdir> <id> "reply"` still works. If the page was built with `--no-paths`, add `--no-paths` to the command too, or the rebuild puts the paths back.
 4. If the feedback asks for a change (add a node, fix a status, correct a fact), edit the `outline-*.md` first, run `build.py`, and say in the reply what changed. Renaming a node makes old quotes say the node is no longer in the map, so rename only when you must.
 5. Tell the user in the chat what you did. When they refresh the page, your reply shows under their item.
 6. If a decision came out of it (what to do first, a suggestion rejected), note it where the project keeps decisions, and change the matching `[proposal]` on the map to `[decided]` or `[todo]`.
 
 Feedback is stored in the user's browser (localStorage), keyed by the `id` in `meta.json` (the `title` if there is no `id`). A different browser does not show what they wrote, but replies carry the original words. Therefore: **choose an `id` once, a short stable ASCII name that no other map of the user's uses, and never change it** (Chrome gives all local files one shared storage, so two maps with the same `id` would mix their feedback).
 
+## Long-running maps (the console)
+
+A map that is read once needs none of this. For one that stays open for days, that the user answers again and again and you keep updating (a project's control map, say), set it up like this; the details are in [references/outline-format.md](references/outline-format.md#long-running-maps-the-now-branch).
+
+1. **Put a first-level branch "Now" first** and set `"now": "Now"` in `meta.json` (the title must match). Inside: what needs the user's decision, what is in progress, what is waiting on others, the next points in time, what was recently finished. The other branches are the detail; "Now" and the detail must agree.
+2. **Use the `[needs-you]` tag** (the first status tag; `【要你定】` in Chinese) only for what truly needs the user's answer or action. If there is nothing, write that there is nothing. It feeds the "Needs you" number; when your reply to feedback has the status `needs-you`, a node with this tag must match it.
+3. **Fix `id` and `root_key` in `meta.json`.** The root title may carry the update time with `{{updated}}` (`{{更新}}` in a Chinese outline); paths use `root_key`, so old quotes and the "what you last saw" snapshot stay valid however the title changes.
+4. **"Recently changed"**: the build fingerprints every node (title, status, note) and the page compares with what the user last saw, marking nodes New or Edited. Edit only what must change; rewriting text for no reason lights up the whole map.
+5. **The page offers a refresh** when you rebuild: the build also writes `<page name>.stamp.js` (skipped with `--no-paths`), which a page left open reads when the user returns to its tab.
+6. **Pulled feedback stays with the map**: `pull_feedback.py` appends to `_fb/inbox.jsonl`, and the build embeds it (plus an optional hand-made `_fb/known.json`), so another browser still shows the user's words, quotes and your replies.
+7. **Keep "Now" current**: whenever something is decided, finished or scheduled, update the "Now" piece and the detail branches to match, then rebuild. `pull_feedback.py` looks at Chrome, Chromium, Edge, Brave and Ego Lite profiles (use `--leveldb <dir>` to point elsewhere); if it finds nothing, ask the user to use "Copy for AI".
+
 ## Why a static page, not a local server
 
 An early version ran a local server that saved feedback to disk and could call the agent. It was dropped for three reasons: people forget to stop servers and they sit in the background; a chat session can end within the hour, and the server and the page die with it; and the page has to work by double-clicking the file, with no backend.
 
-So feedback stays in the browser, goes out through "Copy for AI", and replies come back by regenerating the page. **Do not add a resident service for convenience.** A temporary server for looking at the page is fine; stop it when you are done.
+So feedback stays in the browser, goes out through "pull my feedback" (a one-shot, read-only run when the user asks) or "Copy for AI", and replies come back by regenerating the page. **Do not add a resident service for convenience, and do not pull on a timer.** A temporary server for looking at the page is fine; stop it when you are done.
 
 ## File map
 
@@ -113,12 +131,13 @@ So feedback stays in the browser, goes out through "Copy for AI", and replies co
 | `scripts/build.py` | Builds the single-file html from a work folder; checks structure and prints warnings |
 | `scripts/template.html` | The page: all styles and interaction |
 | `scripts/i18n.json` | Every UI string, per language (`zh`, `en`); add a language here |
-| `scripts/reply.py` | Appends a reply to `replies.json` and rebuilds |
+| `scripts/reply.py` | Appends a reply (conclusion, status, details, related nodes) to `replies.json` and rebuilds |
+| `scripts/pull_feedback.py` | When the user says "pull my feedback": reads their feedback out of the browser's local storage (read-only), records new items in `_fb/inbox.jsonl` and lists them |
 | `references/levels.md` | The four levels, how to choose, sub-agent counts, how to spot-check |
 | `references/brief-template.md` | Template for dispatching a branch-research sub-agent |
 | `references/outline-format.md` | Outline syntax, `meta.json` fields, status tags, how to write nodes |
 
-Each reference also has a `.zh-CN.md` twin. Two complete example folders live in the repository's `examples/` directory (not inside the skill folder): `tool-library-en` and `book-corner-zh`. Build one with `python3 <skill_dir>/scripts/build.py <that folder>` to see the output; do not commit the generated `.html` and `outline.md`.
+Each reference also has a `.zh-CN.md` twin. Four example folders live in the repository's `examples/` directory (not inside the skill folder): `tool-library-en` and `book-corner-zh` (full maps) and `repair-cafe-en` and `repair-cafe-zh` (small long-running maps with a "Now" branch and a `[needs-you]` item). Build one with `python3 <skill_dir>/scripts/build.py <that folder>` to see the output; do not commit the generated `.html` and `outline.md`.
 
 ## Rules to keep
 
@@ -139,3 +158,6 @@ Each reference also has a `.zh-CN.md` twin. Two complete example folders live in
 - Changing `title` without an `id` orphans earlier feedback.
 - The reply command and page path in the page are the absolute paths from build time. If the work folder or the skill folder moved, build again.
 - The "Generated" time in the header changes on every build. Feedback is unaffected because it lives in the browser.
+- A reply marked `needs-you` without a `--node` that points at a `[needs-you]` item makes the build warn; the console number and the "Now" branch then disagree.
+- `"now"` in `meta.json` that differs from the first-level branch title means the branch is not treated as the console's source (the build warns).
+- If `pull_feedback.py` shows an older newest item than the user describes, the browser has not flushed to disk yet. Wait and run it again; do not say there is no new feedback.

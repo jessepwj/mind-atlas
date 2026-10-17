@@ -20,13 +20,21 @@ English and Chinese interface. For Claude Code and Codex.
 **English** · [简体中文](README.zh-CN.md)
 
 [Live demo (English)](https://jessepwj.github.io/mind-atlas/tool-library.html) ·
-[在线演示（中文）](https://jessepwj.github.io/mind-atlas/book-corner.html)
+[在线演示（中文）](https://jessepwj.github.io/mind-atlas/book-corner.html) ·
+[Console demo (English)](https://jessepwj.github.io/mind-atlas/repair-cafe.html) ·
+[控制台演示（中文）](https://jessepwj.github.io/mind-atlas/repair-cafe-zh.html)
 
 </div>
 
 ---
 
 ![A mind-atlas page: the map on the left, the selected node's details and a feedback thread with the agent's reply on the right](docs/assets/screenshot-en.png)
+
+Version 1.1 adds a **console for maps you keep open for days**: five numbers at the top of the page, replies that
+come with a one-line conclusion and a status, and feedback the agent can pull out of your browser. See
+[Maps you keep open for days](#maps-you-keep-open-for-days).
+
+![The console: Needs you, New replies, Recently changed, In progress and Waiting at the top; the list behind Needs you is open, and the right panel puts the questions for you first](docs/assets/screenshot-console-en.png)
 
 ## The problem
 
@@ -44,9 +52,9 @@ mind-atlas is a **skill** (a bundle of instructions, scripts and a page template
    sub-agents**, one per branch, with a brief that demands sources.
 3. **Check the reports against the real sources**, because sub-agents often read stale documents.
 4. **Write an outline** and build **one HTML file**: a horizontal tree you can pan, zoom, search and fold.
-5. **Collect your reactions on the map itself.** Quote a node or a sentence, write what you think, click
-   *Copy for AI*, and paste it into the chat. The agent answers each item and rebuilds the page; your
-   reply appears under your feedback.
+5. **Collect your reactions on the map itself.** Quote a node or a sentence, write what you think, then
+   click *Copy for AI* and paste it into the chat, or just tell the agent "pull my feedback". The agent
+   answers each item and rebuilds the page; your reply appears under your feedback.
 
 The method comes from a real run: a 700-node, 16-branch panorama of a large system, researched by 7 parallel
 sub-agents. The page and the feedback loop stayed because they worked.
@@ -59,11 +67,15 @@ sub-agents. The page and the feedback loop stayed because they worked.
   reporting, and a rule that the main agent re-verifies key statuses.
 - **A page that opens with a double-click.** One file, all data embedded, no server, no network (a content
   security policy enforces it), nothing to install for the reader.
-- **A map you can use.** Branch colors, ten status badges, notes behind an ⓘ, `+N` counts on collapsed
+- **A map you can use.** Branch colors, eleven status badges, notes behind an ⓘ, `+N` counts on collapsed
   branches; drag to pan, pinch or Ctrl/⌘-scroll to zoom; expand to level 1, 2, 3, 4 or all; search with
   next and previous; an outline view; a details panel with breadcrumb, sources and one-click navigation.
-- **Feedback on the map.** Quote a node or a single sentence, write freely, copy it for the agent. Feedback
-  is saved in your browser; replies come back in the rebuilt page.
+- **Feedback on the map.** Quote a node or a single sentence, write freely, copy it for the agent or let it
+  pull it from your browser. Feedback is saved in your browser; replies come back in the rebuilt page.
+- **A console for long-running maps** (new in 1.1). A "Now" branch feeds five numbers at the top (needs you,
+  new replies, recently changed, in progress, waiting); replies carry a one-line conclusion, a status and
+  related nodes; nodes that are new or edited since you last looked are marked; `pull_feedback.py` fetches your
+  feedback from the browser when you say "pull my feedback".
 - **English and Chinese**, both in the page interface (`"lang"` in `meta.json`) and in the outline syntax
   (`[active]` or `【在用】`, ` | ` or ` ｜ `, `[src: ...]` or `〔...〕`). More languages are one block in
   `i18n.json`.
@@ -165,10 +177,33 @@ you ──ask──▶ agent picks a level ──▶ reads the core material (tr
 
 The ten steps, the sub-agent rules and the pitfalls are in [`SKILL.md`](skills/mind-atlas/SKILL.md).
 
+## Maps you keep open for days
+
+Most maps are read once. For one you keep open, answer again and again and the agent keeps updating (a
+project's control map, say), version 1.1 adds a console:
+
+- **Five numbers under the title:** *Needs you*, *New replies*, *Recently changed*, *In progress*, *Waiting*.
+  Click one to see its items, click an item to jump to the node. They come from a first-level **"Now" branch**
+  (`"now": "Now"` in `meta.json`) and the new `[needs-you]` status tag. Beside them, the next point in time.
+- **Replies that are quick to read:** a bold one-line conclusion, a coloured status (Done, In progress, Planned,
+  Dropped, Needs you), details that fold open, and chips for the related nodes. The right panel lists questions
+  for you first, then new replies, then items waiting for the agent, then the handled ones folded by date.
+- **What changed since you last looked:** every node has a content fingerprint; new and edited nodes are marked
+  *New* and *Edited*, and a dot beside `+N` tells you something changed inside a collapsed branch.
+- **Stable names:** `root_key` keeps node paths valid while the root title carries the update time
+  (`{{updated}}`), so old quotes survive. A page left open offers a refresh when you rebuild it.
+- **Feedback without pasting:** say "pull my feedback" and the agent runs `pull_feedback.py`, which reads your items from
+  the browser's local storage (a copy of it, read-only, only when you ask; never on a timer). *Copy for AI* remains as the fallback.
+
+Two small examples show it, with live demos: [English](https://jessepwj.github.io/mind-atlas/repair-cafe.html) and
+[中文](https://jessepwj.github.io/mind-atlas/repair-cafe-zh.html). The setup is in
+[outline-format](skills/mind-atlas/references/outline-format.md#long-running-maps-the-now-branch) and the details of the
+loop in [docs/feedback-loop.md](docs/feedback-loop.md).
+
 ## Using the page
 
 - **Look around.** Drag to pan. Two-finger swipe on a trackpad also pans; pinch, or hold Ctrl/⌘ and scroll,
-  to zoom. *Fit to window* and *Back to root* are in the header.
+  to zoom. *Fit to window* and *Back to "Now"* sit in the zoom bar at the bottom left of the map.
 - **Fold and unfold.** Click a node to select it and expand it; click it again to collapse it. The header
   buttons expand to level 1, 2, 3, 4 or everything. *Show notes* prints every note on the map.
 - **Read the details.** Click a node: its path, status, note, sources and children appear in the right
@@ -182,10 +217,12 @@ The ten steps, the sub-agent rules and the pitfalls are in [`SKILL.md`](skills/m
 1. **Write.** In the right panel, type what you think: a question, something you do not understand, a
    correction, a decision. To refer to a node, hover over it and click the orange 💬 at its corner, or select
    a sentence in the details or the outline view and click *Quote this*. Quoting is optional.
-2. **Copy.** Click *Copy for AI*. All feedback you have not copied yet becomes one block of text, starting
-   with `[Mind map feedback]`. Paste it into the chat.
+2. **Hand it over.** Either click *Copy for AI*: all feedback without a reply that you have not copied yet becomes
+   one block of text, starting with `[Mind map feedback]`, which you paste into the chat. Or tell the agent
+   "pull my feedback": it reads your feedback from the browser itself.
 3. **Reply.** The agent handles each item and runs `reply.py`, which writes the reply to `replies.json` and
-   rebuilds the page. If you asked for a change, it edits the outline first.
+   rebuilds the page. If you asked for a change, it edits the outline first. A reply can carry a one-line
+   conclusion, a status and related nodes.
 4. **Refresh.** Reload the page: the reply appears under your feedback.
 
 Feedback lives in your browser's `localStorage`, keyed by the map's `id`, so it never leaves your machine
@@ -196,7 +233,8 @@ until you paste it. More detail, including the block format: [docs/feedback-loop
 An early version ran a local server that saved feedback to disk. It was dropped for three reasons:
 servers get forgotten and keep running; a chat session can end within the hour and take the server with
 it, leaving a dead page; and a map you can double-click needs no explanation. So feedback stays in the
-browser, goes out through *Copy for AI*, and replies come back by rebuilding the page.
+browser, goes out through *Copy for AI* or a one-shot "pull my feedback" (never a service, never on a timer), and
+replies come back by rebuilding the page.
 
 ## The outline format at a glance
 
@@ -212,9 +250,9 @@ browser, goes out through *Copy for AI*, and replies come back by rebuilding the
     - Buy two dehumidifier boxes [proposal]
 ```
 
-Two spaces per level. ` | ` separates a title from its note, `[src: ...]` gives a source, and ten
-bracketed words give a status: `[active] [stopped] [in progress] [todo] [issue] [done] [decided] [waiting]
-[risk] [proposal]`. Everything also works in Chinese (`【在用】`, ` ｜ `, `〔...〕`), and the two spellings
+Two spaces per level. ` | ` separates a title from its note, `[src: ...]` gives a source, and eleven
+bracketed words give a status: `[needs-you] [active] [stopped] [in progress] [todo] [issue] [done] [decided]
+[waiting] [risk] [proposal]`. Everything also works in Chinese (`【在用】`, ` ｜ `, `〔...〕`), and the two spellings
 can be mixed. Full reference: [outline-format](skills/mind-atlas/references/outline-format.md).
 
 ## Examples and live demos
@@ -223,8 +261,11 @@ can be mixed. Full reference: [outline-format](skills/mind-atlas/references/outl
 |---|---|---|---|
 | Neighborhood Tool Library | English | [`examples/tool-library-en`](examples/tool-library-en) | [open](https://jessepwj.github.io/mind-atlas/tool-library.html) |
 | 小区旧书漂流角 | 中文 | [`examples/book-corner-zh`](examples/book-corner-zh) | [打开](https://jessepwj.github.io/mind-atlas/book-corner.html) |
+| Repair Cafe running view (console) | English | [`examples/repair-cafe-en`](examples/repair-cafe-en) | [open](https://jessepwj.github.io/mind-atlas/repair-cafe.html) |
+| 旧物维修咖啡馆长期视图（控制台） | 中文 | [`examples/repair-cafe-zh`](examples/repair-cafe-zh) | [打开](https://jessepwj.github.io/mind-atlas/repair-cafe-zh.html) |
 
-Both use all ten status tags, a continuation line, sources, and branches attached from separate files. Only
+The first two use ten of the status tags, a continuation line, sources, and branches attached from separate files; the repair cafe pair
+is small and shows the "Now" branch and a `[needs-you]` item. Only
 source files are in the repository; CI builds the demos. To build one yourself:
 
 ```bash
@@ -239,8 +280,8 @@ mind-atlas/
 │   ├── SKILL.md               instructions for the agent
 │   ├── agents/openai.yaml     Codex interface manifest
 │   ├── references/            levels, brief template, outline format (English + 简体中文)
-│   └── scripts/               build.py, reply.py, template.html, i18n.json
-├── examples/                  source files of the two examples
+│   └── scripts/               build.py, reply.py, pull_feedback.py, template.html, i18n.json
+├── examples/                  source files of the four examples
 ├── docs/                      the feedback loop in detail, screenshots
 ├── tests/                     unittest suite (standard library)
 ├── tools/                     demo-site builder, screenshot maker
@@ -254,7 +295,8 @@ mind-atlas/
 contains no external links and a content security policy forbids the page from loading or sending anything.
 
 **Where does my feedback go?** Into your browser's `localStorage` until you click *Copy for AI* and paste it
-somewhere. Open the same file in another browser and you will not see it, but the agent's replies still show
+somewhere, or tell the agent to pull it (the agent then reads a temporary copy of the browser's local storage,
+only when you ask). Open the same file in another browser and you will not see it, but the agent's replies still show
 up, together with your original words when the agent passed `--orig`.
 
 **Why did my old feedback disappear after I renamed the map?** Feedback is stored under the `id` in
