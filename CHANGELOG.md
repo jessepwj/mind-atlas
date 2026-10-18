@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-18
+
+Every map says what it is for, and a map you track can no longer quietly go stale.
+
+### Added
+
+- **A use for every map.** `"use"` in `meta.json` takes `learning`, `project tracking` or `decision` (the Chinese
+  spellings work too) and shows in the page header in the page's language. `SKILL.md` has a new section, "Decide the use
+  first", with the first-level branches for each use. A learning map must end with **"What this means for us"** (what to
+  borrow, whether to adopt it, how it would fit, the next step, every judgment marked `[proposal]`); a tracking map keeps
+  the project's own notes as the source of truth and the map as a view of them. Another value is shown as written, with a warning.
+- **A fixed "Now" branch for project tracking.** Seven sections in this order: Needs you, In progress, Waiting on others,
+  Problems and risks, Next up (every title starts with a date), Later, and Recently done (the last two days, grouped by day,
+  about ten items). Older groups move whole into the History branch under that day. "Update Now in the same step as the project
+  notes" is now part of the instructions.
+- **A stale-"Now" check in `build.py`.** For a map with `"now"`, every build reports: a time point that passed more than 30
+  minutes ago; a time point whose title does not start with a date (`MM-DD HH:MM`, `MM-DD` or `YYYY-MM-DD`; a time under a dated
+  group is fine); "today", "tomorrow", "yesterday", "tonight" and their Chinese counterparts in a title; "Recently done" with more
+  than `done_max` items (default 10) or a day group from two days ago or earlier; an unfinished tag under "Recently done"; and an
+  empty "Needs you". It also lists, as a note, the nodes outside "Now" still tagged `[in progress]` or `[waiting]` (a branch whose
+  title contains "snapshot" is skipped). It only prints (to stderr, like the other warnings); the page is built either way.
+  Sections are recognized by the words in their titles, in English and Chinese; `"now_sections"` in `meta.json` names them
+  when a map uses other words (a title there that matches no section is a warning). When none of the "Needs you", "Next up" and
+  "Recently done" sections is recognized the build says that part was not checked instead of claiming a pass. `build()` returns the
+  findings as `BuildResult.stale` and `BuildResult.open_outside`, and the recognized section kinds as `BuildResult.now_roles`.
+- **Moved nodes keep their quotes and replies.** When a node moves (say from "Recently done" into the History branch) and keeps its
+  title, a reply's `--node` and the page's quotes and reply chips find it by the last part of the path, as long as exactly one
+  node has that title.
+- The console's nearest time point and its list also read `YYYY-MM-DD HH:MM` titles and a year on the parent group.
+- Interface strings for the header (`meta_use` and the `uses` table) in both languages.
+- A "What this means for us" branch in `examples/tool-library-en` and `examples/book-corner-zh`, which are now learning maps; the
+  two `repair-cafe` examples are project-tracking maps with the full seven-section "Now" branch and a `"use"` each.
+- Tests: the date and time reading, every stale-"Now" rule in both languages, the section recognition, the moved-node lookup in the
+  build and in headless Chrome, the `use` field and its header, and the examples against the new rules (the clock is pinned for
+  the dated ones).
+
+### Changed
+
+- Maps that stay open for days are now called project-tracking maps in the docs. The outline-format anchor
+  `#long-running-maps-the-now-branch` is now `#project-tracking-maps-the-now-branch` (the zh-CN one follows).
+- The two `repair-cafe` examples use the seven sections, with dated "Next up" entries and day groups under "Recently done".
+- `BuildResult` has three more fields, `stale`, `open_outside` and `now_roles`, for anyone who imports `build.py`.
+- The demo-site index labels each example by its `use` (project tracking, learning) instead of "long-running console" or "full map".
+
+### Fixed
+
+- The outline-format reference said "ten status tags" in the checklist for sub-agent reports; there are eleven.
+- The list behind the console's time-point number showed the date twice ("11-05 11-05 18:00 ..."); it shows the title as written.
+- "Quote this" now also appears when you select text inside the quote of a node that moved.
+
 ## [1.1.0] - 2026-10-17
 
 A console for maps you keep open for days.
@@ -84,6 +134,7 @@ A console for maps you keep open for days.
 - Bilingual README, contribution guide, code of conduct, security policy, and issue and pull request
   templates.
 
-[Unreleased]: https://github.com/jessepwj/mind-atlas/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/jessepwj/mind-atlas/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/jessepwj/mind-atlas/releases/tag/v1.2.0
 [1.1.0]: https://github.com/jessepwj/mind-atlas/releases/tag/v1.1.0
 [1.0.0]: https://github.com/jessepwj/mind-atlas/releases/tag/v1.0.0

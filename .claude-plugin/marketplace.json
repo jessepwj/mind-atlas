@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "mind-atlas: an agent skill that maps a project or topic into an interactive multi-level HTML mind map",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "plugins": [
     {
@@ -16,8 +16,8 @@
         "repo": "jessepwj/mind-atlas",
         "ref": "main"
       },
-      "description": "Pick a level from overview to panorama, research branches with read-only sub-agents, build a single-file HTML mind map that opens with a double-click, collect feedback on the map itself, and keep a long-running map under control with a console. English and Chinese interface. For Claude Code and Codex.",
-      "version": "1.1.0",
+      "description": "Decide what the map is for (learning, project tracking or a decision), pick a level from overview to panorama, research branches with read-only sub-agents, build a single-file HTML mind map that opens with a double-click, collect feedback on the map itself, and keep a project-tracking map from going stale with a console and a build-time check. English and Chinese interface. For Claude Code and Codex.",
+      "version": "1.2.0",
       "author": {
         "name": "Pan Wenjie",
         "url": "https://github.com/jessepwj"
