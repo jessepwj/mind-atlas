@@ -2,6 +2,7 @@
   "id": "demo-book-corner",
   "title": "小区旧书漂流角全貌（示例）",
   "lang": "zh",
+  "use": "学习理解",
   "out": "book-corner.html",
   "level": "L3 详细（示例，缩小版）",
   "desc": "示范用的小导图，内容是虚构的：主干由整理方自己写，两条分支假设是子智能体调研后改写的。",
@@ -12,6 +13,7 @@
     "outline-B-宣传与活动.md",
     "outline-T-时间与数据.md",
     "outline-Z-问题与下一步.md",
+    "outline-Y-对我们有什么用.md",
     "outline-about.md"
   ]
 }

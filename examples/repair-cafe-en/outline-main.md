@@ -1,21 +1,27 @@
-# Repair Cafe ({{updated}}) | A running view of a monthly repair cafe run by volunteers. Made-up content: it shows the "Now" branch, the five numbers at the top of the page and the "needs you" tag.
-- Now | What is going on right now. The numbers at the top of the page count the tagged items in this branch.
-  - Needs your decision | Everything below carries the "needs you" tag, so it is counted under "Needs you". Answer it as feedback in the right panel.
+# Repair Cafe ({{updated}}) | A running view of a monthly repair cafe run by volunteers. Made-up content: it shows a project-tracking map: the "Now" branch, the five numbers at the top of the page and the "needs you" tag.
+- Now | What is going on right now: always the same seven sections, in this order. The numbers at the top of the page count the tagged items here.
+  - Needs you | Everything below carries the "needs you" tag, so it is counted under "Needs you". Answer it as feedback in the right panel. If nothing needs you, this section says so.
     - Pick the date of the autumn session [needs-you] | Two dates fit: 12 Nov or 19 Nov. The hall is free on both, and the volunteers lean towards the 19th.
     - Approve buying a soldering station for about 80 [needs-you] | The old iron burns out thin wires. The donation jar holds 140.
-  - Under way
+  - In progress | Who is doing it and when there will be a result.
     - Print the new sign-up sheet [in progress] | The draft is done; it still needs a line for "what are you bringing?".
     - Collect spare parts from the school workshop [in progress] | Pick-up is arranged for Saturday morning.
-  - Waiting on others
+  - Waiting on others | Whom we wait for, for what, and since when.
     - Hall committee confirms the booking [waiting] | The committee meets on 5 Nov.
     - Newsletter editor answers about a free notice [waiting]
-  - Next up | Times that are still ahead. The nearest one also shows at the top of the page.
+  - Problems and risks | Known and not settled yet, with the person who owns it. A settled one moves to "Recently done".
+    - If the only multimeter breaks, electrical repairs stop [risk] | The coordinator owns it. A second one could be borrowed from the library; see "Tools and parts".
+  - Next up | Dated points, the nearest first; each title starts with the date. The nearest one also shows at the top of the page.
     - 11-05 18:00 Hall committee meeting
     - 11-12 10:00 Autumn session, if the first date is chosen
     - 11-19 10:00 Autumn session, if the second date is chosen
-  - Recently done
-    - Flyers delivered to 40 mailboxes [done]
-    - Toaster repair guide pinned to the wall [done]
+  - Later | Decided, not dated yet.
+    - Try a weekday evening session in winter [todo] | Waits for the date of the autumn session.
+  - Recently done | The last two days, newest first, about ten items at most. Older groups move into a history branch with their titles unchanged.
+    - 10-18
+      - Flyers delivered to 40 mailboxes [done]
+    - 10-17
+      - Toaster repair guide pinned to the wall [done]
 - Purpose and rules | Why the cafe exists and how a session runs. This is the trunk.
   - Fix what neighbors bring, for free [decided] | Success means fewer things thrown away, not a long list of members.
   - No repairs that need a licence, such as gas or mains wiring [decided] | Safety comes first; the volunteers refer these to a professional.

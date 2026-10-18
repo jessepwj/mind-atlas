@@ -2,6 +2,7 @@
   "id": "demo-tool-library",
   "title": "Neighborhood Tool Library (example)",
   "lang": "en",
+  "use": "learning",
   "out": "tool-library.html",
   "level": "L3 Detailed (example, scaled down)",
   "desc": "A small demo map with made-up content: the trunk was written by the mapper, and two branches pretend to come from read-only research sub-agents.",
@@ -12,6 +13,7 @@
     "outline-B-outreach.md",
     "outline-T-timeline-and-data.md",
     "outline-Z-problems-and-next-steps.md",
+    "outline-Y-what-this-means-for-us.md",
     "outline-about.md"
   ]
 }

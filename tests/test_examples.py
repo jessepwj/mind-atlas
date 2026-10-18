@@ -1,12 +1,16 @@
 """Every example under examples/ must build cleanly and in its own language; the two big ones show off all ten
 statuses, the two small "repair-cafe" ones show the long-running console (the "now" branch and the needs-you tag)."""
 import json
+import os
 import re
 import shutil
 import tempfile
 import unittest
 
 from helpers import CJK, EXAMPLES, build, page_json
+
+# The dates in the console examples are fictional and sit around this moment (2026-10-18 12:00 UTC); their "Now" check is run at it.
+EXAMPLE_EPOCH = "1792324800"
 
 ALL_STATUSES = {"active", "stopped", "doing", "todo", "issue", "done", "decided", "waiting", "risk", "proposal"}
 CONSOLE = "repair-cafe"      # the folder prefix of the long-running console examples
@@ -107,6 +111,40 @@ class ExampleTests(unittest.TestCase):
                 self.assertNotIn("{{", result.root["t"])       # the update-time placeholder was replaced
                 self.assertTrue(any(re.match(r"\d\d-\d\d \d\d:\d\d ", n["t"]) for n, _, _ in build.walk(result.root)),
                                 "dated entries for the 'next up' number")
+
+    def test_the_console_examples_are_project_tracking_maps_with_the_seven_sections_and_a_clean_check(self):
+        sections = {"repair-cafe-en": ["Needs you", "In progress", "Waiting on others", "Problems and risks", "Next up", "Later", "Recently done"],
+                    "repair-cafe-zh": ["要你定的", "在做的", "在等别人的", "问题和风险", "接下来的时间点", "以后再做", "最近做完的"]}
+        os.environ["SOURCE_DATE_EPOCH"] = EXAMPLE_EPOCH
+        self.addCleanup(os.environ.pop, "SOURCE_DATE_EPOCH", None)
+        for src in example_dirs():
+            if not is_console(src):
+                continue
+            with self.subTest(example=src.name):
+                tmp = tempfile.mkdtemp(prefix="mind-atlas-example-")
+                self.addCleanup(shutil.rmtree, tmp, True)
+                meta = json.loads((src / "meta.json").read_text(encoding="utf-8"))
+                result = build.build(shutil.copytree(str(src), tmp + "/work"), no_paths=True)
+                now = result.root["c"][0]
+                self.assertEqual([c["t"] for c in now["c"]], sections[src.name])
+                self.assertEqual(page_json(result.out.read_text(encoding="utf-8"), "meta")["use"], "tracking")
+                self.assertIn(meta["use"], build.USES["tracking"])
+                self.assertEqual(result.stale, [])               # no passed time points, no "today", "Recently done" in limits
+                self.assertEqual(result.open_outside, [])
+
+    def test_the_big_examples_are_learning_maps_that_end_with_what_it_means_for_us(self):
+        for src in example_dirs():
+            if is_console(src):
+                continue
+            with self.subTest(example=src.name):
+                tmp = tempfile.mkdtemp(prefix="mind-atlas-example-")
+                self.addCleanup(shutil.rmtree, tmp, True)
+                result = build.build(shutil.copytree(str(src), tmp + "/work"), no_paths=True)
+                self.assertEqual(page_json(result.out.read_text(encoding="utf-8"), "meta")["use"], "learning")
+                titles = [c["t"] for c in result.root["c"]]
+                self.assertEqual(titles[-2], {"en": "What this means for us", "zh": "对我们有什么用"}[src.name.rsplit("-", 1)[1]])
+                self.assertEqual(titles[-1], {"en": "About this map", "zh": "关于这张图"}[src.name.rsplit("-", 1)[1]])
+                self.assertIsNone(result.stale)                  # no "now" branch, so nothing to check
 
     def test_the_english_example_uses_the_ascii_spellings(self):
         src = EXAMPLES / "tool-library-en"

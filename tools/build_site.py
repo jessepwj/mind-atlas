@@ -61,7 +61,8 @@ def build_site(out_dir):
         finally:
             shutil.rmtree(str(tmp), ignore_errors=True)
         language = "English" if meta.get("lang") == "en" else "中文"
-        kind = "long-running console / 长期控制台" if meta.get("now") else "full map / 全貌图"
+        kind = {"tracking": "project tracking / 跟进项目", "learning": "learning / 学习理解",
+                "decision": "decision / 做决定"}.get(build.normalize_use(meta.get("use", "")), "map / 导图")
         items.append('<li><a href="%s">%s</a> <small>%s, %s, %d nodes</small></li>'
                      % (result.out.name, build.esc(meta["title"]), language, kind, result.nodes))
         written.append(result.out.name)

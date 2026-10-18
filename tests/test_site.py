@@ -23,6 +23,8 @@ class SiteTests(unittest.TestCase):
             meta = page_json((out / name).read_text(encoding="utf-8"), "meta")
             self.assertNotIn("file", meta)
             self.assertNotIn("reply_cmd", meta)
+        self.assertEqual(index.count("project tracking / 跟进项目"), 2)       # the kind comes from the example's "use"
+        self.assertEqual(index.count("learning / 学习理解"), 2)
         self.assertTrue((out / ".nojekyll").exists())
         self.assertEqual(sorted(p.name for p in out.iterdir()), [".nojekyll", "book-corner.html", "index.html", "repair-cafe-zh.html", "repair-cafe.html", "tool-library.html"])
 

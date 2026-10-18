@@ -1,0 +1,5 @@
+- What this means for us | Written for a group that wants to start a similar library. These readings are the mapper's own and are tagged Proposal; nothing here is decided.
+  - Keep the rules to one page: a loan period, a waiver, and "repair or retire" [proposal] | Three rules cover almost every case, and a new volunteer can explain them in a minute.
+  - Start with hand tools and add power tools later [proposal] | Hand tools are two thirds of the shelf and are rarely out. Power tools are always lent, so they need a waiver and a short loan time.
+  - Skip the barcode scanner [proposal] | The paper sign-out sheet beat the phone app in April.
+  - Ask the founder for the waiver and the sign-out sheet as templates [todo]
