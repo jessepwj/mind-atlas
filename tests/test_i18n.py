@@ -9,7 +9,7 @@ I18N = json.loads((SCRIPTS / "i18n.json").read_text(encoding="utf-8"))
 TEMPLATE = (SCRIPTS / "template.html").read_text(encoding="utf-8")
 BUILD_PY = (SCRIPTS / "build.py").read_text(encoding="utf-8")
 PULL_PY = (SCRIPTS / "pull_feedback.py").read_text(encoding="utf-8")
-NESTED = ("tags", "statuses")      # label tables keyed by status, not UI strings
+NESTED = ("tags", "statuses", "uses")      # label tables keyed by status or purpose, not UI strings
 VARS = re.compile(r"\{(\w+)\}")
 
 
@@ -84,6 +84,13 @@ class StringTableTests(unittest.TestCase):
         for lang in I18N:
             self.assertEqual(set(I18N[lang]["statuses"]), keys, lang)
 
+    def test_use_labels_cover_every_purpose_the_build_knows(self):
+        for lang in I18N:
+            self.assertEqual(set(I18N[lang]["uses"]), set(build.USES), lang)
+        for key, spellings in build.USES.items():
+            self.assertIn(I18N["zh"]["uses"][key], spellings)       # the Chinese label is a spelling the build accepts
+            self.assertIn(I18N["en"]["uses"][key], spellings)
+
     def test_chinese_labels_are_the_written_spellings(self):
         spelled = {v: k for k, v in build.TAGS_ZH.items()}
         for key, label in I18N["zh"]["tags"].items():
@@ -102,7 +109,7 @@ class StringTableTests(unittest.TestCase):
     def test_every_key_is_used_somewhere(self):
         asked = set(re.findall(r"\bt\('(\w+)'", TEMPLATE))
         asked |= set(re.findall(r'data-i18n(?:-title|-ph)?="(\w+)"', TEMPLATE))
-        asked |= {"tags", "statuses"} | set(re.findall(r'strings\["(\w+)"\]', BUILD_PY)) | set(re.findall(r'strings\["(\w+)"\]', PULL_PY))
+        asked |= {"tags", "statuses", "uses"} | set(re.findall(r'strings\["(\w+)"\]', BUILD_PY)) | set(re.findall(r'strings\["(\w+)"\]', PULL_PY))
         self.assertEqual(set(I18N["zh"]) - asked, set())
 
     def test_every_language_builds_a_page(self):

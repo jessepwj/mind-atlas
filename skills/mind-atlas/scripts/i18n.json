@@ -2,8 +2,9 @@
   "zh": {
     "html_lang": "zh-CN",
     "reply_args": "<编号> \"细节\" --summary \"一句结论\" --status 已做 --orig \"用户原话\"",
-    "meta_line": "{level}{desc} 按住拖动画布，触控板两指滑动也能移，捏合或按住 ⌘ 滚轮缩放；点节点展开或收起，右栏看说明、写反馈。写完反馈，在会话里对 AI 说一声「去看反馈」，它会取回、逐条回复；页面是静态文件，回复或更新后要刷新才看得到（⌘R）。生成于 {stamp}。",
+    "meta_line": "{use}{level}{desc} 按住拖动画布，触控板两指滑动也能移，捏合或按住 ⌘ 滚轮缩放；点节点展开或收起，右栏看说明、写反馈。写完反馈，在会话里对 AI 说一声「去看反馈」，它会取回、逐条回复；页面是静态文件，回复或更新后要刷新才看得到（⌘R）。生成于 {stamp}。",
     "meta_level": "梳理等级：{level}。",
+    "meta_use": "用途：{use}。",
     "search_hint_default": "搜索节点标题、说明、来源",
     "btn_lv1": "展开到 1 级",
     "btn_lv2": "2 级",
@@ -190,13 +191,19 @@
       "stopped": "已停",
       "decided": "已定",
       "proposal": "建议"
+    },
+    "uses": {
+      "learning": "学习理解",
+      "tracking": "跟进项目",
+      "decision": "做决定"
     }
   },
   "en": {
     "html_lang": "en",
     "reply_args": "<id> \"details\" --summary \"one-line conclusion\" --status done --orig \"the user's words\"",
-    "meta_line": "{level}{desc} Drag to pan; pinch, or hold Ctrl/⌘ and scroll, to zoom. Click a node to select and expand it, and click it again to collapse it. Notes and feedback are in the right panel. When you have written feedback, tell the AI in your chat to “pull my feedback”: it fetches the feedback and replies to each item. The page is a static file, so refresh it (Ctrl/⌘ + R) to see replies and updates. Generated {stamp}.",
+    "meta_line": "{use}{level}{desc} Drag to pan; pinch, or hold Ctrl/⌘ and scroll, to zoom. Click a node to select and expand it, and click it again to collapse it. Notes and feedback are in the right panel. When you have written feedback, tell the AI in your chat to “pull my feedback”: it fetches the feedback and replies to each item. The page is a static file, so refresh it (Ctrl/⌘ + R) to see replies and updates. Generated {stamp}.",
     "meta_level": "Level: {level}. ",
+    "meta_use": "Use: {use}. ",
     "search_hint_default": "Search titles, notes and sources",
     "btn_lv1": "Level 1",
     "btn_lv2": "2",
@@ -422,6 +429,11 @@
       "stopped": "Stopped",
       "decided": "Decided",
       "proposal": "Proposal"
+    },
+    "uses": {
+      "learning": "learning",
+      "tracking": "project tracking",
+      "decision": "decision"
     }
   }
 }

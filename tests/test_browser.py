@@ -295,6 +295,103 @@ class ConsoleBrowserTests(unittest.TestCase):
 
 
 @unittest.skipUnless(CHROME, "set MIND_ATLAS_CHROME to a Chrome/Chromium/Edge executable to run the browser tests")
+class TrackingBrowserTests(unittest.TestCase):
+    """Project-tracking maps: the purpose in the header, and quotes and reply chips that follow a node which moved."""
+
+    OUTLINES = {
+        "en": ("# Atlas ({{updated}})\n- Now\n  - Next up\n    - 2026-10-19 08:00 Year-dated point\n    - 2026-10-21\n      - 09:30 Timed child\n    - 11-05 18:00 Later point\n  - Recently done\n    - 10-18\n      - Fresh item [done]\n- History\n  - 10-17\n"
+               "    - Flyers delivered [done]\n  - 10-16\n    - Same title [done]\n    - Other path\n      - Same title [done]\n  - constructor\n",
+               "Atlas", ["Now", "Recently done", "Flyers delivered"], "Same title", "Gone"),
+        "zh": ("# 图（{{更新}}）\n- 现在\n  - 接下来的时间点\n    - 2026-10-19 08:00 带年份的点\n    - 2026-10-21\n      - 09:30 分组下的点\n    - 11-05 18:00 靠后的点\n  - 最近做完的\n    - 10-18\n      - 新的 【已完成】\n- 历程\n  - 10-17\n"
+               "    - 传单已投 【已完成】\n  - 10-16\n    - 同名 【已完成】\n    - 另一支\n      - 同名 【已完成】\n  - constructor\n",
+               "图", ["现在", "最近做完的", "传单已投"], "同名", "不在了"),
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = pathlib.Path(tempfile.mkdtemp(prefix="mind-atlas-tracking-"))
+        cls.runs = {}
+        for lang, (outline, root, moved, same, gone) in cls.OUTLINES.items():
+            work = cls.tmp / lang
+            work.mkdir()
+            (work / "meta.json").write_text(json.dumps({
+                "title": "Tracking " + lang, "id": "tracking-" + lang, "lang": lang, "use": "project tracking" if lang == "en" else "跟进项目",
+                "level": "L2", "desc": "A test.", "root_key": root, "now": moved[0]}, ensure_ascii=False), encoding="utf-8")
+            (work / "outline.md").write_text(outline, encoding="utf-8")
+            (work / "replies.json").write_text(json.dumps([{"id": "F-R", "ts": "2026-10-18 10:00:00", "text": "Done.", "summary": "Done.",
+                                                            "status": "done", "nodes": [" › ".join(moved)]}], ensure_ascii=False), encoding="utf-8")
+            result = build.build(work, no_paths=True)
+            quote = lambda path: {"p": [root] + path, "x": ""}
+            items = [{"id": "F-%d" % i, "ts": "2026-10-18 09:%02d:00" % i, "text": "about %d" % i, "quotes": [q], "ctx": None, "sent": None,
+                      "replaces": None} for i, q in enumerate([
+                          quote(moved),                                  # the node moved to History: found by its last title
+                          quote(["History", "10-17", moved[2]]),         # its real path
+                          quote(moved[:2] + [same]),                     # two nodes have this title: not guessed
+                          quote(moved[:2] + [gone])])]                   # no such node
+            cls.runs[lang] = (result, bh.run_scenario(result.out, "a", seed=("tracking-" + lang, items), chrome=CHROME, scenario=bh.TRACKING_JS))
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(str(cls.tmp), ignore_errors=True)
+
+    def test_no_errors(self):
+        for lang, (_, run) in self.runs.items():
+            with self.subTest(lang=lang):
+                self.assertEqual(run["errors"], [])
+                self.assertEqual(run["violations"], [])
+                self.assertEqual(run["nodes"], self.runs[lang][0].nodes)    # a node called "constructor" does not break the lookups
+
+    def test_the_header_says_what_the_map_is_for(self):
+        self.assertTrue(self.runs["en"][1]["hmeta"].startswith("Use: project tracking. Level: L2. A test. "), self.runs["en"][1]["hmeta"])
+        self.assertTrue(self.runs["zh"][1]["hmeta"].startswith("用途：跟进项目。梳理等级：L2。A test. "), self.runs["zh"][1]["hmeta"])
+        self.assertIsNone(CJK.search(self.runs["en"][1]["hmeta"]))
+
+    def test_the_nearest_time_point_reads_a_year_and_a_date_on_a_parent(self):
+        for lang, (_, run) in self.runs.items():
+            with self.subTest(lang=lang):
+                self.assertTrue(run["next"]["shown"])
+                self.assertEqual(run["next"]["tm"], "2026-10-19 08:00")
+                self.assertEqual(run["next"]["lb"], {"en": "Year-dated point", "zh": "带年份的点"}[lang])
+                self.assertEqual(len(run["nextItems"]), 3)
+                # in time order: the year-dated point, the one under the dated group (not read as month 26), the last one
+                self.assertTrue(run["nextItems"][0].startswith("2026-10-19 08:00"), run["nextItems"])
+                self.assertTrue(run["nextItems"][1].startswith("09:30"), run["nextItems"])
+                self.assertTrue(run["nextItems"][2].startswith("11-05 18:00"), run["nextItems"])
+
+    def test_a_use_that_is_a_property_name_is_shown_as_written(self):
+        work = self.tmp / "odd-use"
+        work.mkdir()
+        (work / "meta.json").write_text(json.dumps({"title": "Odd use", "id": "odd-use", "lang": "en", "use": "toString"}), encoding="utf-8")
+        (work / "outline.md").write_text("# R\n- A\n", encoding="utf-8")
+        run = bh.run_scenario(build.build(work, no_paths=True).out, "a", chrome=CHROME, scenario=bh.TRACKING_JS)
+        self.assertEqual(run["errors"], [])
+        self.assertTrue(run["hmeta"].startswith("Use: toString. "), run["hmeta"])
+
+    def test_a_quote_of_a_moved_node_still_finds_it(self):
+        for lang, (_, run) in self.runs.items():
+            moved = self.OUTLINES[lang][2][2]
+            with self.subTest(lang=lang):
+                self.assertEqual(len(run["quotes"]), 4)
+                self.assertEqual(run["quotes"][0]["selected"], moved)       # old path, found by its last title
+                self.assertEqual(run["quotes"][0]["toast"], "")
+                self.assertEqual(run["quotes"][1]["selected"], moved)       # real path
+
+    def test_a_title_shared_by_two_nodes_or_missing_is_not_guessed(self):
+        for lang, (_, run) in self.runs.items():
+            with self.subTest(lang=lang):
+                for q in run["quotes"][2:]:
+                    self.assertIsNone(q["selected"])
+                    self.assertTrue(q["toast"], q)
+
+    def test_the_reply_chip_and_the_badges_follow_the_moved_node(self):
+        for lang, (_, run) in self.runs.items():
+            moved = self.OUTLINES[lang][2][2]
+            with self.subTest(lang=lang):
+                self.assertEqual(run["chips"], [{"text": moved, "selected": moved}])
+                self.assertIn(moved, run["badges"])
+
+
+@unittest.skipUnless(CHROME, "set MIND_ATLAS_CHROME to a Chrome/Chromium/Edge executable to run the browser tests")
 class StampBrowserTests(unittest.TestCase):
     """A page left open offers a refresh when its .stamp.js says there is a newer build."""
 

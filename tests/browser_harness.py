@@ -171,6 +171,45 @@ CONSOLE_JS = r"""
 """
 
 
+TRACKING_JS = r"""
+(async function(){
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const $ = id => document.getElementById(id);
+  const out = {errors: window.__errors, violations: window.__violations};
+  try {
+    out.hmeta = $('hmeta').textContent;
+    out.quotes = [];
+    for (const qb of Array.from(document.querySelectorAll('#fbl .qb'))) {
+      $('toast').style.display = 'none';
+      document.querySelectorAll('.node.sel').forEach(n => n.classList.remove('sel'));
+      qb.click(); await sleep(150);
+      const sel = document.querySelector('.node.sel .t');
+      out.quotes.push({key: qb.dataset.key, selected: sel ? sel.textContent : null,
+                       toast: $('toast').style.display === 'block' ? $('toast').textContent : ''});
+    }
+    out.chips = [];
+    for (const nc of Array.from(document.querySelectorAll('#fbl .nc'))) {
+      document.querySelectorAll('.node.sel').forEach(n => n.classList.remove('sel'));
+      nc.click(); await sleep(150);
+      const sel = document.querySelector('.node.sel .t');
+      out.chips.push({text: nc.textContent, selected: sel ? sel.textContent : null});
+    }
+    const nxt = document.querySelector('#cons .chip[data-k="next"]');
+    out.next = {shown: nxt.style.display !== 'none', tm: nxt.querySelector('.tm').textContent, lb: nxt.querySelector('.lb').textContent};
+    nxt.click(); await sleep(80);
+    out.nextItems = Array.from(document.querySelectorAll('#pop .ci')).map(e => e.querySelector('.ct').textContent);
+    nxt.click(); await sleep(30);
+    out.badges = Array.from(document.querySelectorAll('.node .fbn')).filter(e => e.textContent).map(e => e.closest('.node').querySelector('.t').textContent);
+    out.nodes = document.querySelectorAll('.node').length;
+  } catch (e) { window.__errors.push('scenario: ' + e.message); }
+  out.errors = window.__errors; out.violations = window.__violations;
+  const div = document.createElement('div'); div.id = '__result';
+  div.setAttribute('data-b64', btoa(unescape(encodeURIComponent(JSON.stringify(out)))));
+  document.body.appendChild(div);
+})();
+"""
+
+
 def fnv_key(text):
     """The page's short hash of a node path (FNV-1a, base 36); the snapshot of what the user last saw uses it."""
     h = 0x811c9dc5

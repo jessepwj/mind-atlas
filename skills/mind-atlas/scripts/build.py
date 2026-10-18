@@ -7,7 +7,10 @@ Usage:
 The work directory holds:
     meta.json      {"title": ..., "id": ..., "lang": "zh" | "en", "level": ..., "desc": ...,
                     "search_hint": ..., "parts": [outline files, joined in order], "out": ...,
-                    "root_key": the root's fixed name inside node paths, "now": title of the "now" branch}
+                    "root_key": the root's fixed name inside node paths, "now": title of the "now" branch,
+                    "use": what the map is for (learning / project tracking / decision),
+                    "done_max": most items "Recently done" keeps (default 10),
+                    "now_sections": titles of the "now" sections, only when they do not use the usual words}
     outline-*.md   outline pieces (or a single outline.md when "parts" is not given)
     replies.json   replies to the user's feedback (written by reply.py; optional)
     _fb/           feedback already pulled back (pull_feedback.py writes inbox.jsonl; known.json is an
@@ -22,6 +25,13 @@ edited since the user last looked; "root_key" keeps node paths stable when the r
 time ("{{updated}}" in the root title becomes "updated MM-DD HH:MM"); "now" names the first-level branch that
 holds what is going on right now (it takes no colour, starts expanded, and its [in progress] / [waiting] /
 [needs-you] nodes feed the five numbers at the top of the page).
+
+Project-tracking maps (v1.2): when meta.json has "now", the build also checks that the "now" branch has not gone stale
+and prints what it finds (it never stops the build): time points that passed more than 30 minutes ago, time points
+that do not start with a date, "today" / "tomorrow" style wording, a "Recently done" section with too many items or a
+group from two days ago or more, unfinished work filed under "done", and an empty "needs you" section. It also lists
+the nodes outside "now" that are still tagged [in progress] or [waiting] (a branch whose title has "snapshot" is
+skipped). A node that moved but kept its title is still found by its last title when a reply points at it.
 
 Outline syntax (two spaces per level, spaces only):
     # Root title | root note
@@ -53,7 +63,8 @@ TEMPLATE = SCRIPT_DIR / "template.html"
 I18N_FILE = SCRIPT_DIR / "i18n.json"
 
 DEFAULT_LANG = "zh"
-META_FIELDS = {"title", "id", "lang", "level", "desc", "search_hint", "parts", "out", "root_key", "now"}
+META_FIELDS = {"title", "id", "lang", "level", "desc", "search_hint", "parts", "out", "root_key", "now", "use", "done_max",
+               "now_sections"}
 
 # Status tags: spelling -> canonical key (the key is what the page stores and styles).
 TAGS_ZH = {
@@ -70,6 +81,13 @@ TAG_RE = re.compile("【(" + _TAG_ZH_ALT + ")】|(?<!\\\\)\\[(" + _TAG_EN_ALT + 
 SRC_RE = re.compile("〔([^〕]*)〕|(?<!\\\\)\\[(?:src|source):\\s*([^\\]]*)\\]", re.IGNORECASE)
 ESCAPED_RE = re.compile("\\\\(\\[(?:" + _TAG_EN_ALT + "|src:|source:))", re.IGNORECASE)
 SEP_RE = re.compile(" ｜ | \\| ")
+# What a map is for ("use" in meta.json): canonical key -> accepted spellings, lower case. The page shows the label in
+# its own language (i18n.json "uses"); a value that is none of these is shown as written, with a warning.
+USES = {
+    "learning": ("learning", "学习理解", "学习"),
+    "tracking": ("project tracking", "project-tracking", "tracking", "跟进项目", "跟进"),
+    "decision": ("decision", "deciding", "decision making", "做决定", "决定"),
+}
 # Reply statuses: canonical key -> accepted spellings (Chinese, English, and the key itself).
 # reply.py keeps an identical copy of STATUS_ALIASES (a test checks that they agree).
 STATUSES = ["done", "doing", "planned", "dropped", "needs-you"]
@@ -82,7 +100,11 @@ STATUS_ALIASES = {
 }
 BAD_FILENAME_CHARS = re.compile('[\\\\/:*?"<>|\\x00-\\x1f]')
 
-BuildResult = collections.namedtuple("BuildResult", "out nodes depth kb replies warnings root known tagged")
+# `stale` lists what is out of date in the "now" branch of a project-tracking map (empty: it looks current; None: the map
+# has no "now" branch to check) and `open_outside` the nodes outside it that are still tagged in progress or waiting (see
+# check_now); `now_roles` is the kinds of section it recognized in "Now" (None without the branch). None of them is counted in
+# `warnings`.
+BuildResult = collections.namedtuple("BuildResult", "out nodes depth kb replies warnings root known tagged stale open_outside now_roles")
 
 
 class BuildError(Exception):
@@ -216,6 +238,206 @@ def check_nodes(root):
     return warnings
 
 
+# ---- Project-tracking maps: has the "now" branch gone stale? -----------------------------------------------------------
+# A tracking map is only worth having while its "Now" is true. These checks run on every build of a map that has "now" in
+# meta.json. They only report; the page is built either way. Chinese and English spellings are both understood.
+
+# Wording that is wrong a day later ("today", "tomorrow", "tonight" ...); a date such as 10-19 stays true.
+REL_DAY = re.compile(r"今天|明天|昨天|今晚|明晚|今早|今晨|明晨|(?<!说)明早|后天(?!数)|前天(?!数)"
+                     r"|\b(?:today|tomorrow|yesterday|tonight|this (?:morning|afternoon|evening)|last night)\b", re.IGNORECASE)
+# A title may start with a date (MM-DD or YYYY-MM-DD, then maybe a weekday) and then a time (HH:MM), or with a time alone.
+DATE_LEAD = re.compile(r"^\s*(?:(\d{4})-)?(0?[1-9]|1[0-2])-(0?[1-9]|[12]\d|3[01])(?!\d)"
+                       r"(?:\s*(?:周[一二三四五六日天]|(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?))?", re.IGNORECASE)
+TIME_LEAD = re.compile(r"\s*(\d{1,2})[:：](\d{2})(?!\d)")
+# Tags that say "not finished": they do not belong under "Recently done".
+UNFINISHED = ("needs-you", "doing", "todo", "issue", "risk", "waiting", "proposal")
+TAG_SPELLING = {"doing": "in progress"}      # the English spelling of a tag where it differs from the key
+# What the sections of the "now" branch are, by the words in their titles (first match wins). A map whose sections use
+# other words says so in meta.json "now_sections".
+NOW_ROLES = tuple((role, re.compile(words, re.IGNORECASE)) for role, words in (
+    ("ask", r"要你定|needs[ -]you|your (?:decision|call)|to decide"),
+    ("next", r"^\s*(?:接下来|(?:next|upcoming|coming up)\b)"),     # like the page, which looks for a title that starts so
+    ("later", r"以后|\b(?:later|someday|backlog)\b|not (?:yet )?scheduled"),
+    ("done", r"做完|完成|\b(?:done|finished|completed)\b"),
+    ("issues", r"问题|风险|\b(?:problems?|issues?|risks?)\b"),
+    ("doing", r"在做|\b(?:in progress|under ?way|doing)\b|working on"),
+    ("waiting", r"在等|等别人|\bwaiting\b|\bblocked\b|on others"),
+))
+NOW_ROLE_KEYS = tuple(role for role, _ in NOW_ROLES)
+LATE_GRACE = datetime.timedelta(minutes=30)
+
+
+def nearest_date(month, day, today):
+    """The date with this month and day (no year written) that lies closest to today; None when there is none."""
+    best = None
+    for year in (today.year - 1, today.year, today.year + 1):
+        try:
+            cand = datetime.date(year, month, day)
+        except ValueError:
+            continue
+        if best is None or abs((cand - today).days) < abs((best - today).days):
+            best = cand
+    return best
+
+
+def lead_when(title, today):
+    """What a title starts with. Returns (day, hour, minute): day is a datetime.date when it starts with a date, and hour
+    and minute are numbers when a time follows (or the title starts with a time alone); each is None when absent."""
+    day, rest = None, title
+    m = DATE_LEAD.match(title)
+    if m:
+        month, dom = int(m.group(2)), int(m.group(3))
+        try:
+            day = datetime.date(int(m.group(1)), month, dom) if m.group(1) else nearest_date(month, dom, today)
+        except ValueError:
+            day = None
+        if day is None:
+            return None, None, None
+        rest = title[m.end():]
+    t = TIME_LEAD.match(rest)
+    if t and int(t.group(1)) < 24 and int(t.group(2)) < 60:
+        return day, int(t.group(1)), int(t.group(2))
+    return day, None, None
+
+
+def due_moment(day, hour, minute):
+    """When a time point falls due: its time, or the end of its day when only a date is written."""
+    if hour is None:
+        return datetime.datetime.combine(day, datetime.time(23, 59))
+    return datetime.datetime.combine(day, datetime.time(hour, minute))
+
+
+def now_role(title, mapping):
+    """Which section of the "now" branch a title is: first the titles listed in meta.json "now_sections", then the words in it."""
+    for role, named in (mapping or {}).items():
+        if named == title:
+            return role
+    for role, words in NOW_ROLES:
+        if words.search(title):
+            return role
+    return ""
+
+
+def tag_names(keys):
+    return " ".join("[%s]" % TAG_SPELLING.get(k, k) for k in sorted(keys))
+
+
+def check_time_points(section, now, warnings):
+    """Every time point under the "next" section must start with a date and must not be long past."""
+    today = now.date()
+
+    def late(name, day, hour, minute):
+        if due_moment(day, hour, minute) < now - LATE_GRACE:
+            shown = "%02d-%02d%s" % (day.month, day.day, "" if hour is None else " %02d:%02d" % (hour, minute))
+            warnings.append('"%s": %s has passed. If it happened, move it to the done section; if not, give it a new date '
+                            'or say what it is waiting for' % (name, shown))
+
+    def visit(node, path, parent_day):
+        name = " › ".join(path + [node["t"]])
+        day, hour, minute = lead_when(node["t"], today)
+        if day is None and hour is not None:                 # "18:00 ...": the date comes from the group above it
+            day = parent_day
+            if day is None:
+                warnings.append('"%s": a time without a date; start the title with the date (10-19 05:00 ...)' % name)
+                return
+        if day is None:
+            if parent_day is not None:                       # a detail under a dated point, not a time point itself
+                return
+            if node["c"]:                                    # a plain group ("Week 45"): look at what is inside
+                for child in node["c"]:
+                    visit(child, path + [node["t"]], None)
+            else:
+                warnings.append('"%s": a time point must start with a date (10-19 05:00 ...); put it under "Later" '
+                                'if it has no date yet' % name)
+            return
+        timed_kids = [c for c in node["c"] if lead_when(c["t"], today)[0] is None and lead_when(c["t"], today)[1] is not None]
+        if not (timed_kids and hour is None):                # a day group such as "11-05" is judged by its timed children
+            late(name, day, hour, minute)
+        for child in node["c"]:
+            visit(child, path + [node["t"]], day)
+
+    for child in section["c"]:
+        visit(child, [section["t"]], None)
+
+
+def check_done(section, meta, now, warnings):
+    """"Recently done" keeps about two days and at most done_max items, and holds nothing that is still open."""
+    today = now.date()
+    cap = meta.get("done_max", 10)
+    items = []
+    for child in section["c"]:
+        day, hour, _ = lead_when(child["t"], today)
+        if child["c"] and not child["g"] and day is not None and hour is None:      # a group for one day: "10-18"
+            items.extend(child["c"])
+            if (today - day).days >= 2:
+                warnings.append('"%s › %s" is two days old or more; move the whole group into the history branch under '
+                                'that day, keeping the titles' % (section["t"], child["t"]))
+        else:
+            items.append(child)
+    if len(items) > cap:
+        warnings.append('"%s" has %d items, more than %d; move the older ones into the history branch under their day '
+                        '(keep the titles, quotes find nodes by them) and leave the latest here' % (section["t"], len(items), cap))
+    for item in items:
+        left = set(UNFINISHED) & set(item["g"])
+        if left:
+            warnings.append('"%s › %s" carries %s, so it is not finished; move it to the section it belongs to (Needs you, '
+                            'In progress, Waiting on others, Problems and risks or Later)' % (section["t"], item["t"], tag_names(left)))
+
+
+def check_now(root, meta, now):
+    """Is the "now" branch of a project-tracking map out of date? Returns a list of messages (empty when it looks current).
+
+    `now` is a naive datetime. Nothing here stops a build: a map that is behind is still worth reading, and the agent
+    is told what to fix."""
+    title = meta.get("now")
+    node = next((c for c in root["c"] if c["t"] == title), None) if title else None
+    if node is None:
+        return []
+    warnings = []
+    for n, _, _ in walk(node):
+        if REL_DAY.search(n["t"]):
+            warnings.append('"%s": wording like "today" or "tomorrow" is wrong a day later; write the date (10-19)' % n["t"])
+    for section in node["c"]:
+        role = now_role(section["t"], meta.get("now_sections"))
+        if role == "ask" and not section["c"]:
+            warnings.append('"%s" is empty; add one node saying nothing needs the user right now, so it does not look '
+                            'forgotten' % section["t"])
+        elif role == "next":
+            check_time_points(section, now, warnings)
+        elif role == "done":
+            check_done(section, meta, now, warnings)
+    return warnings
+
+
+def open_outside_now(root, meta):
+    """Paths of the nodes outside "now" that are still tagged [in progress] or [waiting]. Detail branches are the easiest
+    place to forget an update. A branch whose title has "snapshot" is skipped: it deliberately keeps an old state."""
+    found = []
+
+    def visit(node, path):
+        if "快照" in node["t"] or "snapshot" in node["t"].lower():
+            return
+        here = path + [node["t"]]
+        if {"doing", "waiting"} & set(node["g"]):
+            found.append(" › ".join(here))
+        for child in node["c"]:
+            visit(child, here)
+
+    for child in root["c"]:
+        if child["t"] != meta.get("now"):
+            visit(child, [])
+    return found
+
+
+def now_roles_found(root, meta):
+    """The kinds of section (ask, next, done ...) that the first-level "now" branch has, found by title; None without the branch."""
+    title = meta.get("now")
+    node = next((c for c in root["c"] if c["t"] == title), None) if title else None
+    if node is None:
+        return None
+    return sorted({now_role(c["t"], meta.get("now_sections")) for c in node["c"]} - {""})
+
+
 def js(obj):
     """JSON for embedding inside a <script> element."""
     s = json.dumps(obj, ensure_ascii=False)
@@ -280,6 +502,15 @@ def normalize_status(value):
     return STATUS_ALIASES.get(str(value).strip().lower())
 
 
+def normalize_use(value):
+    """Canonical key (learning, tracking, decision) for any accepted spelling, or None."""
+    word = " ".join(str(value).strip().lower().split())
+    for key, spellings in USES.items():
+        if word in spellings:
+            return key
+    return None
+
+
 def fingerprint(title, tags, note):
     """Eight hex digits that change when a node's title, status tags or note change."""
     raw = "\x1f".join([title, ",".join(sorted(tags)), note])
@@ -335,6 +566,12 @@ def resolve_node(spec, keys, root_key):
             return inside[0], ""
         if len(inside) > 1:
             return None, "%d node titles contain these words; write a longer path" % len(inside)
+    else:
+        # The node moved (say from "Recently done" into a history branch) but kept its title: the last title alone
+        # is enough when only one node has it. The page finds quotes the same way.
+        moved = [k for k in keys if k.rsplit(" › ", 1)[-1] == parts[-1]]
+        if len(moved) == 1:
+            return moved[0], ""
     return None, "not found in the map"
 
 
@@ -434,6 +671,22 @@ def build(workdir, no_paths=False):
     now_title = meta.get("now", "")
     if not isinstance(now_title, str):
         raise BuildError("meta.json \"now\" must be a string")
+    use = meta.get("use", "")
+    if not isinstance(use, str):
+        raise BuildError("meta.json \"use\" must be a string")
+    use_key = normalize_use(use) if use.strip() else None
+    if use.strip() and use_key is None:
+        warnings.append("meta.json \"use\" is %r; the known values are learning, project tracking and decision "
+                        "(it is shown as written)" % use)
+    done_max = meta.get("done_max", 10)
+    if isinstance(done_max, bool) or not isinstance(done_max, int) or done_max < 1:
+        raise BuildError("meta.json \"done_max\" must be a whole number of at least 1")
+    sections = meta.get("now_sections", {})
+    if not isinstance(sections, dict) or not all(isinstance(v, str) for v in sections.values()):
+        raise BuildError("meta.json \"now_sections\" must be an object that maps section kinds to titles, "
+                         "for example {\"next\": \"Scheduled\"}")
+    warnings.extend("meta.json \"now_sections\": unknown kind %r (use %s)" % (k, ", ".join(NOW_ROLE_KEYS))
+                    for k in sorted(set(sections) - set(NOW_ROLE_KEYS)))
     moment = now_moment()
     stamp, stamp_full = moment.strftime("%Y-%m-%d %H:%M"), moment.strftime("%Y-%m-%d %H:%M:%S")
     keys = annotate(root, root_key)
@@ -441,6 +694,15 @@ def build(workdir, no_paths=False):
         root["t"] = root["t"].replace(token, strings["root_updated"].format(md=moment.strftime("%m-%d %H:%M")))
     if now_title and not any(c["t"] == now_title for c in root["c"]):
         warnings.append("meta.json \"now\" is %r, but the root has no first-level branch with that title" % now_title)
+    # The checks below read the outline as written; the clock is local time (UTC under SOURCE_DATE_EPOCH, for tests).
+    stale, open_outside, now_roles = None, [], None     # None = no "now" branch to check
+    if now_title and any(c["t"] == now_title for c in root["c"]):
+        stale = check_now(root, meta, moment.replace(tzinfo=None))
+        open_outside = open_outside_now(root, meta)
+        now_roles = now_roles_found(root, meta)
+        branch = next(c for c in root["c"] if c["t"] == now_title)
+        warnings.extend("meta.json \"now_sections\": %r is not the title of any section in the %r branch" % (named, now_title)
+                        for named in sorted(set(sections.values()) - {c["t"] for c in branch["c"]}))
 
     replies = load_json(wd / "replies.json", default=[])
     if not isinstance(replies, list) or not all(isinstance(r, dict) and "id" in r for r in replies):
@@ -487,6 +749,7 @@ def build(workdir, no_paths=False):
         "stamp_full": stamp_full,
         "root_key": root_key,
         "now": now_title,
+        "use": use_key or use.strip(),
         "statuses": STATUSES,
     }
     if "search_hint" in meta:
@@ -511,7 +774,8 @@ def build(workdir, no_paths=False):
         write_text(stamp_js, "window.__MM_LATEST=" + js({"stamp_full": stamp_full}) + ";\n")
     depth = max(d for _, d, _ in nodes)
     tagged = {tag: sum(1 for n, _, _ in nodes if tag in n["g"]) for tag in ("needs-you", "doing", "waiting")}
-    return BuildResult(out, len(nodes), depth, out.stat().st_size // 1024, len(replies), warnings, root, len(known), tagged)
+    return BuildResult(out, len(nodes), depth, out.stat().st_size // 1024, len(replies), warnings, root, len(known), tagged,
+                       stale, open_outside, now_roles)
 
 
 def configure_streams():
@@ -521,6 +785,26 @@ def configure_streams():
             stream.reconfigure(errors="backslashreplace")
         except (AttributeError, ValueError):
             pass
+
+
+def print_now_report(r, limit=12):
+    """Tell the agent what is out of date in the "now" branch (stderr, like the other warnings) or that it looks current."""
+    for w in r.stale or []:
+        print('WARNING: "Now" branch is behind: ' + w, file=sys.stderr)
+    missing = [name for role, name in (("ask", "Needs you"), ("next", "Next up"), ("done", "Recently done"))
+               if r.now_roles is not None and role not in r.now_roles]
+    if missing:
+        print('  "Now" branch check: no section was recognized as %s, so that part was not checked (use the usual titles, or '
+              'name them in "now_sections")' % ", ".join(missing))
+    elif r.stale == []:
+        print('  "Now" branch check passed: no passed time points, no relative dates, "Recently done" within limits')
+    if r.open_outside:
+        print('NOTE: %d node(s) outside the "Now" branch are still tagged [in progress] or [waiting]. On a big update check '
+              'them, and tag the finished ones [done]:' % len(r.open_outside), file=sys.stderr)
+        for path in r.open_outside[:limit]:
+            print("  " + path, file=sys.stderr)
+        if len(r.open_outside) > limit:
+            print("  (and %d more)" % (len(r.open_outside) - limit), file=sys.stderr)
 
 
 def main(argv=None):
@@ -542,6 +826,7 @@ def main(argv=None):
         print("  %s (%d nodes)" % (branch["t"] or "(empty title)", count_nodes(branch)))
     for w in r.warnings:
         print("WARNING: " + w, file=sys.stderr)
+    print_now_report(r)
 
 
 if __name__ == "__main__":
