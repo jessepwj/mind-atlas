@@ -30,9 +30,12 @@ English and Chinese interface. For Claude Code and Codex.
 
 ![A mind-atlas page: the map on the left, the selected node's details and a feedback thread with the agent's reply on the right](docs/assets/screenshot-en.png)
 
-Version 1.1 adds a **console for maps you keep open for days**: five numbers at the top of the page, replies that
-come with a one-line conclusion and a status, and feedback the agent can pull out of your browser. See
-[Maps you keep open for days](#maps-you-keep-open-for-days).
+Version 1.2 starts every map with **what it is for**: learning a thing, keeping track of a project, or laying out a
+decision. A tracking map gets a fixed seven-section "Now" branch, and the build tells the agent when that branch has gone
+stale. See [Choose a use](#choose-a-use) and [Maps you keep open for days](#maps-you-keep-open-for-days).
+
+Version 1.1 added a **console for maps you keep open for days**: five numbers at the top of the page, replies that
+come with a one-line conclusion and a status, and feedback the agent can pull out of your browser.
 
 ![The console: Needs you, New replies, Recently changed, In progress and Waiting at the top; the list behind Needs you is open, and the right panel puts the questions for you first](docs/assets/screenshot-console-en.png)
 
@@ -47,7 +50,7 @@ cannot argue with it point by point.
 mind-atlas is a **skill** (a bundle of instructions, scripts and a page template) for coding agents such as
 **Claude Code** and **Codex**. Ask your agent to map something out. It will:
 
-1. **Choose a level** that fits your purpose, from a 30-node overview to a 1,000-node panorama.
+1. **Choose a use and a level** that fit your purpose: learn a thing, track a project or decide between options, from a 30-node overview to a 1,000-node panorama.
 2. **Read the core material itself** to get the trunk, and, for bigger maps, **fan out read-only
    sub-agents**, one per branch, with a brief that demands sources.
 3. **Check the reports against the real sources**, because sub-agents often read stale documents.
@@ -72,10 +75,14 @@ sub-agents. The page and the feedback loop stayed because they worked.
   next and previous; an outline view; a details panel with breadcrumb, sources and one-click navigation.
 - **Feedback on the map.** Quote a node or a single sentence, write freely, copy it for the agent or let it
   pull it from your browser. Feedback is saved in your browser; replies come back in the rebuilt page.
-- **A console for long-running maps** (new in 1.1). A "Now" branch feeds five numbers at the top (needs you,
-  new replies, recently changed, in progress, waiting); replies carry a one-line conclusion, a status and
-  related nodes; nodes that are new or edited since you last looked are marked; `pull_feedback.py` fetches your
-  feedback from the browser when you say "pull my feedback".
+- **A use for every map** (new in 1.2). `"use"` in `meta.json` (learning, project tracking or decision) shows in the
+  page header and decides how the branches are ordered. A learning map ends with "What this means for us", so you
+  can pick a next step.
+- **A console for project-tracking maps** (1.1, extended in 1.2). A "Now" branch with seven fixed sections feeds
+  five numbers at the top (needs you, new replies, recently changed, in progress, waiting); replies carry a
+  one-line conclusion, a status and related nodes; nodes that are new or edited since you last looked are marked;
+  `pull_feedback.py` fetches your feedback from the browser when you say "pull my feedback". On every build the
+  agent is told what in "Now" is out of date.
 - **English and Chinese**, both in the page interface (`"lang"` in `meta.json`) and in the outline syntax
   (`[active]` or `【在用】`, ` | ` or ` ｜ `, `[src: ...]` or `〔...〕`). More languages are one block in
   `i18n.json`.
@@ -83,6 +90,17 @@ sub-agents. The page and the feedback loop stayed because they worked.
   with file and line; it warns about ellipsis truncation, empty and duplicate titles.
 - **Standard library only.** Python 3.9 or newer, macOS, Linux and Windows. CI runs the tests on Ubuntu and
   Windows across Python 3.9 to 3.13.
+
+## Choose a use
+
+The same page serves three uses. The use decides how the first-level branches are ordered and whether the map must be
+kept up to date afterwards. The agent settles it first and writes it in `meta.json` as `"use"`.
+
+| Use | When | What the map looks like | Afterwards |
+|---|---|---|---|
+| **Learning** | Understand a project, an app, a mechanism, a pile of material | Key points, what it is, what it is made of, how it works, how to use it, limits, **what this means for us**, about this map | Read once or twice; no upkeep |
+| **Project tracking** | A project that runs for many days and you need to know where it stands | A **Now** branch first, then purpose and blueprint, detail branches, problems, history | Updated whenever the project moves; the build checks that "Now" is not stale |
+| **Decision** | Choose between a few options | What must be decided, one branch per option, a recommendation marked as a proposal, what is still unclear | Mark the choice as decided; often one branch inside a tracking map |
 
 ## Choose a level
 
@@ -180,11 +198,19 @@ The ten steps, the sub-agent rules and the pitfalls are in [`SKILL.md`](skills/m
 ## Maps you keep open for days
 
 Most maps are read once. For one you keep open, answer again and again and the agent keeps updating (a
-project's control map, say), version 1.1 adds a console:
+project's control map, say), there is a console:
 
 - **Five numbers under the title:** *Needs you*, *New replies*, *Recently changed*, *In progress*, *Waiting*.
   Click one to see its items, click an item to jump to the node. They come from a first-level **"Now" branch**
-  (`"now": "Now"` in `meta.json`) and the new `[needs-you]` status tag. Beside them, the next point in time.
+  (`"now": "Now"` in `meta.json`) and the `[needs-you]` status tag. Beside them, the next point in time.
+- **Seven fixed sections in "Now"** (1.2): *Needs you*, *In progress*, *Waiting on others*, *Problems and risks*,
+  *Next up* (every title starts with a date), *Later* and *Recently done* (the last two days, about ten items).
+  The agent updates "Now" in the same step as the project notes, and a node that moves keeps its title, so old
+  quotes and replies still find it.
+- **A check that "Now" is not stale** (1.2): every build of a map with `"now"` reports time points that have
+  passed, time points without a date, "today" and "tomorrow" wording, a "Recently done" that has grown too long
+  or holds unfinished work, an empty *Needs you*, and nodes outside "Now" still tagged *In progress* or *Waiting*.
+  It only prints; the page is built either way.
 - **Replies that are quick to read:** a bold one-line conclusion, a coloured status (Done, In progress, Planned,
   Dropped, Needs you), details that fold open, and chips for the related nodes. The right panel lists questions
   for you first, then new replies, then items waiting for the agent, then the handled ones folded by date.
@@ -197,7 +223,7 @@ project's control map, say), version 1.1 adds a console:
 
 Two small examples show it, with live demos: [English](https://jessepwj.github.io/mind-atlas/repair-cafe.html) and
 [中文](https://jessepwj.github.io/mind-atlas/repair-cafe-zh.html). The setup is in
-[outline-format](skills/mind-atlas/references/outline-format.md#long-running-maps-the-now-branch) and the details of the
+[outline-format](skills/mind-atlas/references/outline-format.md#project-tracking-maps-the-now-branch) and the details of the
 loop in [docs/feedback-loop.md](docs/feedback-loop.md).
 
 ## Using the page
@@ -261,11 +287,12 @@ can be mixed. Full reference: [outline-format](skills/mind-atlas/references/outl
 |---|---|---|---|
 | Neighborhood Tool Library | English | [`examples/tool-library-en`](examples/tool-library-en) | [open](https://jessepwj.github.io/mind-atlas/tool-library.html) |
 | 小区旧书漂流角 | 中文 | [`examples/book-corner-zh`](examples/book-corner-zh) | [打开](https://jessepwj.github.io/mind-atlas/book-corner.html) |
-| Repair Cafe running view (console) | English | [`examples/repair-cafe-en`](examples/repair-cafe-en) | [open](https://jessepwj.github.io/mind-atlas/repair-cafe.html) |
-| 旧物维修咖啡馆长期视图（控制台） | 中文 | [`examples/repair-cafe-zh`](examples/repair-cafe-zh) | [打开](https://jessepwj.github.io/mind-atlas/repair-cafe-zh.html) |
+| Repair Cafe running view (project tracking) | English | [`examples/repair-cafe-en`](examples/repair-cafe-en) | [open](https://jessepwj.github.io/mind-atlas/repair-cafe.html) |
+| 旧物维修咖啡馆长期视图（跟进项目） | 中文 | [`examples/repair-cafe-zh`](examples/repair-cafe-zh) | [打开](https://jessepwj.github.io/mind-atlas/repair-cafe-zh.html) |
 
-The first two use ten of the status tags, a continuation line, sources, and branches attached from separate files; the repair cafe pair
-is small and shows the "Now" branch and a `[needs-you]` item. Only
+The first two are learning maps: they use ten of the status tags, a continuation line, sources, branches attached from
+separate files, and end with "What this means for us". The repair cafe pair is small and shows a project-tracking map:
+the seven-section "Now" branch and `[needs-you]` items. Only
 source files are in the repository; CI builds the demos. To build one yourself:
 
 ```bash

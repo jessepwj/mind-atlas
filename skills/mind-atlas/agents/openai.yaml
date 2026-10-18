@@ -1,4 +1,4 @@
 interface:
   display_name: "mind-atlas"
   short_description: "Map a project or topic into an interactive multi-level HTML mind map"
-  default_prompt: "Use $mind-atlas to map out this project: decide which level (L1 overview to L4 panorama) fits my purpose, research the branches, write the outline, and build the HTML mind map. Set the page language to match mine."
+  default_prompt: "Use $mind-atlas to map out this project: decide what the map is for (learning, project tracking or a decision) and which level (L1 overview to L4 panorama) fits my purpose, research the branches, write the outline, and build the HTML mind map. Set the page language to match mine."

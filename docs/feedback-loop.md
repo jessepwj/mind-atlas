@@ -129,13 +129,14 @@ Chinese spellings of the statuses (已做, 在做, 定了待做, 不做, 要你�
 replies, the last one's status counts: answering a question with a later reply of another status closes it.
 Every part is optional, and replies written by version 1.0 still show.
 
-## The console for long-running maps
+## The console for project-tracking maps
 
 For a map that stays open for days, the top of the page has five numbers: **Needs you**, **New replies**,
 **Recently changed**, **In progress** and **Waiting**. Click one to list its items, click an item to jump to the node. The right
 panel is ordered the same way: questions for you first, then new replies, then items waiting for the agent, then the handled
 ones folded by date. A reply counts as read once it has stayed in view for two seconds. The setup (a "Now" branch,
-`root_key`, the `[needs-you]` tag) is in the [outline format](../skills/mind-atlas/references/outline-format.md#long-running-maps-the-now-branch).
+`root_key`, the `[needs-you]` tag) is in the [outline format](../skills/mind-atlas/references/outline-format.md#project-tracking-maps-the-now-branch).
+Since version 1.2 the build also checks that the "Now" branch has not gone stale and prints what to fix, so the agent keeps the numbers true.
 
 ## Where things are stored
 
